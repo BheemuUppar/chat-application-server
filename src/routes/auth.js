@@ -61,7 +61,7 @@ router.post("/login", async (req, res) => {
             if(isValid){
                 let {password , ...params} = users.rows[0];
                
-                let token  = await jwt.sign(params, 'secretkeysecretekey');
+                let token  = await jwt.sign(params, process.env.JWTSECRETEKEY);
                 res.status(200).json({message:"login successfull", token:token})
             }
             else{
