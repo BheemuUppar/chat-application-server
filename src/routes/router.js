@@ -1,9 +1,12 @@
 const express = require("express");
-
+const parser = require('body-parser')
 const app = express();
 const  AuthRouter = require("./auth");
 const UsersRouter = require("./users");
 const MessageRouter = require("./messages")
+
+app.use(parser.json())
+
 
 app.use("/auth" , AuthRouter);
 app.use("/users" , UsersRouter);
@@ -20,7 +23,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(3000, () => {
-  console.log("server is running... ");
+  console.log("server is running... 3000");
 });
 
 module.exports = app;
