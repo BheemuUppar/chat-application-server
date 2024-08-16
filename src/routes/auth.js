@@ -3,29 +3,27 @@ const router = express.Router();
 const client = require("../db/connect/connections");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const json = require("body-parser/lib/types/json");
 
 router.post("/register", async (req, res) => {
-  let { name, email, mobile,  password } = req.body;
+  let { name, email, mobile, password } = req.body;
   let query = `
-    insert into users(name,email,mobile, password)
-    values($1, $2, $3,$4)
-    `;
+    INSERT INTO users(name, email, mobile, password)
+    VALUES($1, $2, $3, $4)
+  `;
   try {
-    // check if user with email  exist
-    //  if not then insert user
-    let users = await client.query(
-      ` SELECT * 
-        FROM USERS
-        WHERE EMAIL = $1;
-        `,
-      [email]
-    );
+    // Check if user with email exists
+    let users = await client.query(`
+      SELECT * 
+      FROM USERS
+      WHERE EMAIL = $1;
+    `, [email]);
+
     if (users.rows.length > 0) {
-      res.status(409).json({ message: "user already exits" });
+      res.status(409).json({ message: "User already exists" });
     } else {
-      // before register hash password
+      // Hash password before registration
       let hashedPassword = await bcrypt.hash(password, 10);
+      console.log("onregister ", password)
 
       let result = await client.query(query, [
         name,
@@ -33,44 +31,44 @@ router.post("/register", async (req, res) => {
         mobile,
         hashedPassword,
       ]);
-      res.status(200).json({ message: "user registered" });
+      res.status(200).json({ message: "User registered" });
     }
   } catch (error) {
-    if (error) res.status(500).json(error);
-    res.status(500).json({ message: "Something Broken" });
+    console.error(error);  // Log the actual error
+    res.status(500).json({ message: "Something broke" });
   }
 });
 
 router.post("/login", async (req, res) => {
-  let { email, password } = req.body;
+  let { username, password } = req.body;
 
   try {
-    // check if user exist with the email
-    let users =await  client.query( `
-        SELECT * FROM USERS
-        WHERE EMAIL = $1
-        `, [email])
+    // Check if user exists with the email
+    let users = await client.query(`
+      SELECT * FROM USERS
+      WHERE EMAIL = $1
+    `, [username]);
 
-        if(users.rows.length ==  0){
-            res.status(404).json({message : "user not found"});
-        }
-        else{
-            users.rows[0].password 
-            let isValid  = await bcrypt.compare(password ,  users.rows[0].password );
-            if(isValid){
-                let {password , ...params} = users.rows[0];
-               
-                let token  = await jwt.sign(params, process.env.JWTSECRETEKEY);
-                res.status(200).json({message:"login successfull", token:token})
-            }
-            else{
-                res.status(401).json({message:"invalid credientials"})
-            }
-     
-        }
+    if (users.rows.length == 0) {
+      res.status(404).json({ message: "User does not exist" });
+    } else {
+      let user = users.rows[0];
+      let hashedPassword = user.password;
+      console.log("on login  ", user)
+      // Compare password
+      let isValid = await bcrypt.compare(password, hashedPassword);
+
+      if (isValid) {
+        let { password, ...params } = user;
+        let token = await jwt.sign(params, process.env.JWTSECRETEKEY);
+        res.status(200).json({ message: "Login successful", token });
+      } else {
+        res.status(401).json({ message: "Invalid credentials" });
+      }
+    }
   } catch (err) {
-    console.log(err)
-    res.status(500).json(err)
+    console.error(err);  // Log the actual error
+    res.status(500).json({ message: "Something broke" });
   }
 });
 

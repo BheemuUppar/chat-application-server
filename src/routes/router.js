@@ -12,7 +12,7 @@ app.use(parser.json())
 app.use("/auth" , AuthRouter);
 app.use("/users" , UsersRouter);
 app.use("/message" , MessageRouter);
-
+console.log('JWT Secret Key:', process.env.JWTSECRETEKEY);
 // error handling middleware
 
 app.use((err, req, res, next) => {
