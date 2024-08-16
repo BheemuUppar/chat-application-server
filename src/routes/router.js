@@ -4,7 +4,8 @@ const app = express();
 const  AuthRouter = require("./auth");
 const UsersRouter = require("./users");
 const MessageRouter = require("./messages")
-
+const cors = require('cors');
+app.use(cors())
 app.use(parser.json())
 
 

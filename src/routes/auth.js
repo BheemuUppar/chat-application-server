@@ -6,10 +6,10 @@ const bcrypt = require("bcrypt");
 const json = require("body-parser/lib/types/json");
 
 router.post("/register", async (req, res) => {
-  let { name, email, mobile, profile_path, password } = req.body;
+  let { name, email, mobile,  password } = req.body;
   let query = `
-    insert into users(name,email,mobile,profile_path, password)
-    values($1, $2, $3,$4, $5)
+    insert into users(name,email,mobile, password)
+    values($1, $2, $3,$4)
     `;
   try {
     // check if user with email  exist
@@ -31,7 +31,6 @@ router.post("/register", async (req, res) => {
         name,
         email,
         mobile,
-        profile_path,
         hashedPassword,
       ]);
       res.status(200).json({ message: "user registered" });
