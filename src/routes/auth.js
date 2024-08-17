@@ -23,7 +23,6 @@ router.post("/register", async (req, res) => {
     } else {
       // Hash password before registration
       let hashedPassword = await bcrypt.hash(password, 10);
-      console.log("onregister ", password)
 
       let result = await client.query(query, [
         name,
@@ -54,12 +53,11 @@ router.post("/login", async (req, res) => {
     } else {
       let user = users.rows[0];
       let hashedPassword = user.password;
-      console.log("on login  ", user)
       // Compare password
       let isValid = await bcrypt.compare(password, hashedPassword);
 
       if (isValid) {
-        let { password, ...params } = user;
+        let { password,  ...params } = user;
         let token = await jwt.sign(params, process.env.JWTSECRETEKEY);
         res.status(200).json({ message: "Login successful", token });
       } else {
