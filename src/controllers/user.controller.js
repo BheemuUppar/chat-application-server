@@ -1,6 +1,7 @@
 const client = require("../db/connect/connections");
 const fs = require("fs");
 const path = require("path");
+const queries = require("../db/queries/Queries");
 
 
 
@@ -8,16 +9,9 @@ const uploadProfile = async (req, res)=>{
     let file = req.file.path;
   let userId = req.body.id;
 
-  let query = `
-   update users
-   set profile_path = $1
-   where id = $2; `;
+  let query = queries.setProfilePath;
   await client.query(query, [file, userId]);
-  let result = await client.query(
-    `
-    select id, name,email, mobile, profile_path, created_at
-    from users where id = $1;
-    `,
+  let result = await client.query(queries.finduserById,
     [userId]
   );
   const filePath = result.rows[0].profile_path;
@@ -35,10 +29,7 @@ const uploadProfile = async (req, res)=>{
 
 const getUserById = async (req, res)=>{
     let id = req.params.id;
-    let query = `
-    select * from users
-    where id = $1;
-    `;
+    let query =queries.getAllDeatailsOfUserById;
     let data = await client.query(query, [id]);
     if (data.rows.length === 0) {
       res.status(404).json({ message: "No user found" });
