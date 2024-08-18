@@ -2,6 +2,7 @@ const client = require("../db/connect/connections");
 const fs = require("fs");
 const path = require("path");
 const queries = require("../db/queries/Queries");
+const { query } = require("express");
 
 
 
@@ -48,4 +49,40 @@ const getUserById = async (req, res)=>{
     delete data.rows[0]?.password;
     res.status(200).json({ data: data.rows[0] });
 }
-module.exports = {uploadProfile, getUserById}
+
+
+const searchUSers = async (req, res)=>{
+  let query
+  let params
+  let searchQuery = req.query.search
+  if (isNaN(searchQuery)) {
+    // searchQuery is not a number, so treat it as a string
+    const str = '%' + searchQuery + '%';
+    query = `
+      SELECT * FROM users 
+      WHERE UPPER(name) LIKE UPPER($1) 
+         OR UPPER(email) LIKE UPPER($1)
+    `;
+    params = [str];
+  } else {
+    // searchQuery is a number, so treat it as an ID
+    query = `
+      SELECT * FROM users 
+      WHERE id = $1 
+         OR UPPER(name) LIKE UPPER($2) 
+         OR UPPER(email) LIKE UPPER($2)
+    `;
+    const str = '%' + searchQuery + '%';
+    params = [parseInt(searchQuery, 10), str];
+  }
+  
+  try {
+    const data = await client.query(query, params);
+    res.status(200).json({data:data.rows});
+ }catch(error){
+  res.status(400).json({message:"Unable to fetch users"})
+  // res.status(400).json(error)
+ }
+  
+}
+module.exports = {uploadProfile, getUserById, searchUSers}
