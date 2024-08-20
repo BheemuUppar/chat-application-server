@@ -95,6 +95,7 @@ const searchUSers = async (req, res) => {
       user.profile_path = convertImagetoString(user.profile_path);
       return user;
     });
+  
     res.status(200).json({ data: data });
   } catch (error) {
     console.log(error);
@@ -102,4 +103,59 @@ const searchUSers = async (req, res) => {
     // res.status(400).json(error)
   }
 };
-module.exports = { uploadProfile, getUserById, searchUSers };
+
+const sendMessage = async (data)=>{
+let sender_id = data.sender_id;
+
+let inboxData = await findInbox(data.sender_id, data.receiver_id);
+let message_text = data.message_text;
+
+
+let sendMessageQuery = `
+insert into messages (inbox_id, sender_id, message_text)
+values($1, $2, $3)
+`
+console.log(inboxData)
+await client.query(sendMessageQuery, [inboxData.inbox_id, sender_id, message_text]);
+
+let fetchMessagesQuery = `
+SELECT * FROM MESSAGES WHERE INBOX_ID = $1
+`
+let messages  = await client.query(fetchMessagesQuery, [inboxData.inbox_id])
+
+return messages.rows;
+
+// let receiver_id = data.receiver_id;
+
+
+}
+
+async function findInbox(userId1, userId2 ){
+   try{
+    let findInboxQuery = `
+    select * from inbox 
+    WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+    ` 
+  let inbox = await  client.query(findInboxQuery, [userId1 , userId2]);
+ if(inbox.rows.length == 0){
+  let createInbox =  `
+  INSERT INTO INBOX (USER1_ID, USER2_ID)
+  VALUES ($1, $2)
+  `
+  console.log('creating...')
+  let inbox = await  client.query(createInbox, [userId1 , userId2]);
+  console.log('created...' , inbox)
+
+
+  return inbox.rows[0]
+ }
+ console.log(inbox.rows)
+ return inbox.rows[0]
+   }catch(error){
+    console.log("failed to create inbox")
+    console.log(error)
+   }
+
+}
+
+module.exports = { uploadProfile, getUserById, searchUSers, sendMessage };

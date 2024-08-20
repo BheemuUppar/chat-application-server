@@ -1,4 +1,5 @@
-const {Server} = require('socket.io')
+const {Server} = require('socket.io');
+const { sendMessage } = require('../controllers/user.controller');
 
 // Initialize Socket.IO with CORS settings
  let   io ;
@@ -19,6 +20,16 @@ const {Server} = require('socket.io')
       onlineUsers.push(socket.id)
       socket.broadcast.emit('onlineusers', onlineUsers);
   
+
+      socket.on("sendMessage", async  (data)=>{
+        socket.join(data.receiver_id);
+        console.log("send message event")
+       let  messages = await sendMessage(data)
+       socket.to(data.receiver_id).emit(messages)
+       // create room if not exist
+   
+      })
+
     // Handle disconnection
     socket.on("disconnect", () => {
        let index = onlineUsers.indexOf(socket.id);
