@@ -11,18 +11,18 @@ const queries = {
   setProfilePath: `
    update users
    set profile_path = $1
-   where id = $2; `,
+   where user_id = $2; `,
   finduserById: `
-   select id, name,email, mobile, profile_path, created_at
-   from users where id = $1;
+   select user_id, name,email, mobile, profile_path, created_at
+   from users where user_id = $1;
    `,
   getAllDeatailsOfUserById: `
    select * from users
-   where id = $1;
+   where user_id = $1;
    `,
    searchUser:`
    select * from users
-   where id = $1
+   where user_id = $1
     OR UPPER(NAME) LIKE UPPER($2) 
     OR  UPPER(EMAIL) LIKE UPPER($2)
    `
