@@ -23,9 +23,10 @@ const { sendMessage } = require('../controllers/user.controller');
 
       socket.on("sendMessage", async  (data)=>{
         socket.join(data.receiver_id);
-        console.log("send message event")
+       
        let  messages = await sendMessage(data)
-       socket.to(data.receiver_id).emit(messages)
+       socket.emit("sent")
+
        // create room if not exist
    
       })
