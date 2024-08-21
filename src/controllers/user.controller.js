@@ -72,7 +72,10 @@ const searchUSers = async (req, res) => {
     // searchQuery is not a number, so treat it as a string
     const str = "%" + searchQuery + "%";
     query = `
-      SELECT * FROM users 
+      SELECT user_id as contact_id,
+      name as contact_name,last_seen,
+      profile_path, email
+ FROM users 
       WHERE UPPER(name) LIKE UPPER($1) 
          OR UPPER(email) LIKE UPPER($1)
     `;
@@ -106,6 +109,7 @@ const searchUSers = async (req, res) => {
 
 const sendMessage = async (data) => {
   let sender_id = data.sender_id;
+  console.log(data)
 
   let inboxData = await findInbox(data.sender_id, data.receiver_id);
   let message_text = data.message_text;
@@ -133,28 +137,34 @@ SELECT * FROM MESSAGES WHERE INBOX_ID = $1
 async function findInbox(userId1, userId2) {
   try {
     let findInboxQuery = `
-    select * from inbox 
-    WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+      SELECT * FROM inbox 
+      WHERE (user1_id = $1 AND user2_id = $2) 
+      OR (user1_id = $2 AND user2_id = $1)
     `;
     let inbox = await client.query(findInboxQuery, [userId1, userId2]);
-    if (inbox.rows.length == 0) {
-      let createInbox = `
-  INSERT INTO INBOX (USER1_ID, USER2_ID)
-  VALUES ($1, $2)
-  `;
-      console.log("creating...");
-      let inbox = await client.query(createInbox, [userId1, userId2]);
-      console.log("created...", inbox);
 
-      return inbox.rows[0];
+    if (inbox.rows.length === 0) {
+      let createInboxQuery = `
+        INSERT INTO inbox (user1_id, user2_id)
+        VALUES ($1, $2)
+        RETURNING *
+      `;
+      console.log("Creating inbox...");
+      let newInbox = await client.query(createInboxQuery, [userId1, userId2]);
+      console.log("Created inbox:", newInbox.rows[0]);
+
+      return newInbox.rows[0];
     }
-    console.log(inbox.rows);
+
+    console.log("Found inbox:", inbox.rows[0]);
     return inbox.rows[0];
   } catch (error) {
-    console.log("failed to create inbox");
-    console.log(error);
+    console.log("Failed to find or create inbox");
+    console.error(error);
+    throw error; // Rethrow the error to handle it further up the chain if needed
   }
 }
+
 
 async function getAllinbox(req, res) {
   try {
@@ -165,7 +175,7 @@ async function getAllinbox(req, res) {
     CASE 
         WHEN i.user1_id = $1 THEN u2.user_id
         ELSE u1.user_id
-    END AS contact_id,
+        END AS contact_id,
     CASE 
         WHEN i.user1_id = $1 THEN u2.name
         ELSE u1.name
@@ -178,6 +188,10 @@ async function getAllinbox(req, res) {
         WHEN i.user1_id = $1 THEN u2.last_seen
         ELSE u1.last_seen
     END AS contact_last_seen,
+    CASE 
+        WHEN i.user1_id = $1 THEN u2.profile_path
+        ELSE u1.profile_path
+    END AS profile_path,
     m.message_text AS last_message,
     m.sent_at AS last_message_time,
     m.sender_id
@@ -201,6 +215,15 @@ WHERE i.user1_id = $1 OR i.user2_id = $1;
 
       `;
     let data = await client.query(query, [userid]);
+
+    data.rows = data.rows.map((obj)=>{
+      if(obj.profile_path == null){
+        return obj
+      }else{
+       obj.profile_path = convertImagetoString( obj.profile_path);
+       return obj
+      }
+    })
 res.status(200).json(data.rows)
   } catch (err) {
     res.status(500).json({message:"Failed to fetch inbox"})
