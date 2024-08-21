@@ -95,7 +95,7 @@ const searchUSers = async (req, res) => {
       user.profile_path = convertImagetoString(user.profile_path);
       return user;
     });
-  
+
     res.status(200).json({ data: data });
   } catch (error) {
     console.log(error);
@@ -104,58 +104,122 @@ const searchUSers = async (req, res) => {
   }
 };
 
-const sendMessage = async (data)=>{
-let sender_id = data.sender_id;
+const sendMessage = async (data) => {
+  let sender_id = data.sender_id;
 
-let inboxData = await findInbox(data.sender_id, data.receiver_id);
-let message_text = data.message_text;
+  let inboxData = await findInbox(data.sender_id, data.receiver_id);
+  let message_text = data.message_text;
 
-
-let sendMessageQuery = `
+  let sendMessageQuery = `
 insert into messages (inbox_id, sender_id, message_text)
 values($1, $2, $3)
-`
-console.log(inboxData)
-await client.query(sendMessageQuery, [inboxData.inbox_id, sender_id, message_text]);
+`;
+  await client.query(sendMessageQuery, [
+    inboxData.inbox_id,
+    sender_id,
+    message_text,
+  ]);
 
-let fetchMessagesQuery = `
+  let fetchMessagesQuery = `
 SELECT * FROM MESSAGES WHERE INBOX_ID = $1
-`
-let messages  = await client.query(fetchMessagesQuery, [inboxData.inbox_id])
+`;
+  let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
 
-return messages.rows;
+  return messages.rows;
 
-// let receiver_id = data.receiver_id;
+  // let receiver_id = data.receiver_id;
+};
 
-
-}
-
-async function findInbox(userId1, userId2 ){
-   try{
+async function findInbox(userId1, userId2) {
+  try {
     let findInboxQuery = `
     select * from inbox 
     WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
-    ` 
-  let inbox = await  client.query(findInboxQuery, [userId1 , userId2]);
- if(inbox.rows.length == 0){
-  let createInbox =  `
+    `;
+    let inbox = await client.query(findInboxQuery, [userId1, userId2]);
+    if (inbox.rows.length == 0) {
+      let createInbox = `
   INSERT INTO INBOX (USER1_ID, USER2_ID)
   VALUES ($1, $2)
-  `
-  console.log('creating...')
-  let inbox = await  client.query(createInbox, [userId1 , userId2]);
-  console.log('created...' , inbox)
+  `;
+      console.log("creating...");
+      let inbox = await client.query(createInbox, [userId1, userId2]);
+      console.log("created...", inbox);
 
-
-  return inbox.rows[0]
- }
- console.log(inbox.rows)
- return inbox.rows[0]
-   }catch(error){
-    console.log("failed to create inbox")
-    console.log(error)
-   }
-
+      return inbox.rows[0];
+    }
+    console.log(inbox.rows);
+    return inbox.rows[0];
+  } catch (error) {
+    console.log("failed to create inbox");
+    console.log(error);
+  }
 }
 
-module.exports = { uploadProfile, getUserById, searchUSers, sendMessage };
+async function getAllinbox(req, res) {
+  try {
+    let userid = req.params.user_id;
+    let query = `
+      SELECT 
+    i.inbox_id,
+    CASE 
+        WHEN i.user1_id = $1 THEN u2.user_id
+        ELSE u1.user_id
+    END AS contact_id,
+    CASE 
+        WHEN i.user1_id = $1 THEN u2.name
+        ELSE u1.name
+    END AS contact_name,
+    CASE 
+        WHEN i.user1_id = $1 THEN u2.currentStatus
+        ELSE u1.currentStatus
+    END AS contact_status,
+    CASE 
+        WHEN i.user1_id = $1 THEN u2.last_seen
+        ELSE u1.last_seen
+    END AS contact_last_seen,
+    m.message_text AS last_message,
+    m.sent_at AS last_message_time,
+    m.sender_id
+FROM inbox i
+JOIN users u1 ON i.user1_id = u1.user_id
+JOIN users u2 ON i.user2_id = u2.user_id
+LEFT JOIN (
+    SELECT 
+        inbox_id,
+        message_text,
+        sent_at,
+        sender_id
+    FROM messages
+    WHERE (inbox_id, sent_at) IN (
+        SELECT inbox_id, MAX(sent_at)
+        FROM messages
+        GROUP BY inbox_id
+    )
+) m ON m.inbox_id = i.inbox_id
+WHERE i.user1_id = $1 OR i.user2_id = $1;
+
+      `;
+    let data = await client.query(query, [userid]);
+res.status(200).json(data.rows)
+  } catch (err) {
+    res.status(500).json({message:"Failed to fetch inbox"})
+  }
+}
+
+const getAllMessages = async(req, res)=>{
+try{
+  let inbox_id = req.params.inbox_id;
+let query = `
+select * from messages where inbox_id = $1;
+` 
+let data = await client.query(query, [inbox_id]);
+res.status(200).json(data.rows)
+}catch(err){
+  res.status(500).json({message:"unable to fetch message"})
+}
+}
+
+
+
+module.exports = { uploadProfile, getUserById, searchUSers, sendMessage, getAllinbox, getAllMessages };
