@@ -109,7 +109,6 @@ const searchUSers = async (req, res) => {
 
 const sendMessage = async (data) => {
   let sender_id = data.sender_id;
-  console.log(data)
 
   let inboxData = await findInbox(data.sender_id, data.receiver_id);
   let message_text = data.message_text;
