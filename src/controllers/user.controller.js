@@ -109,7 +109,6 @@ const searchUSers = async (req, res) => {
 
 const sendMessage = async (data) => {
   let sender_id = data.sender_id;
-
   let inboxData = await findInbox(data.sender_id, data.receiver_id);
   let message_text = data.message_text;
 
@@ -138,8 +137,8 @@ async function findInbox(userId1, userId2) {
     let findInboxQuery = `
       SELECT * FROM inbox 
       WHERE (user1_id = $1 AND user2_id = $2) 
-      OR (user1_id = $2 AND user2_id = $1)
-    `;
+      OR (user1_id = $2 AND user2_id = $1) `;
+
     let inbox = await client.query(findInboxQuery, [userId1, userId2]);
 
     if (inbox.rows.length === 0) {
@@ -164,17 +163,16 @@ async function findInbox(userId1, userId2) {
   }
 }
 
-
 async function getAllinbox(req, res) {
   try {
     let userid = req.params.user_id;
     let query = `
-      SELECT 
+    SELECT 
     i.inbox_id,
     CASE 
         WHEN i.user1_id = $1 THEN u2.user_id
         ELSE u1.user_id
-        END AS contact_id,
+    END AS contact_id,
     CASE 
         WHEN i.user1_id = $1 THEN u2.name
         ELSE u1.name
@@ -193,7 +191,8 @@ async function getAllinbox(req, res) {
     END AS profile_path,
     m.message_text AS last_message,
     m.sent_at AS last_message_time,
-    m.sender_id
+    m.sender_id,
+    COALESCE(unread_counts.unread_count, 0) AS unread_count
 FROM inbox i
 JOIN users u1 ON i.user1_id = u1.user_id
 JOIN users u2 ON i.user2_id = u2.user_id
@@ -210,38 +209,68 @@ LEFT JOIN (
         GROUP BY inbox_id
     )
 ) m ON m.inbox_id = i.inbox_id
+LEFT JOIN (
+    SELECT 
+        inbox_id,
+        COUNT(*) AS unread_count
+    FROM messages
+    WHERE message_status = 'unread'
+    AND sender_id <> $1
+    GROUP BY inbox_id
+) unread_counts ON unread_counts.inbox_id = i.inbox_id
 WHERE i.user1_id = $1 OR i.user2_id = $1;
-
-      `;
+ 
+    `;
     let data = await client.query(query, [userid]);
 
-    data.rows = data.rows.map((obj)=>{
-      if(obj.profile_path == null){
-        return obj
-      }else{
-       obj.profile_path = convertImagetoString( obj.profile_path);
-       return obj
+    data.rows = data.rows.map((obj) => {
+      if (obj.profile_path == null) {
+        return obj;
+      } else {
+        obj.profile_path = convertImagetoString(obj.profile_path);
+        return obj;
       }
-    })
-res.status(200).json(data.rows)
+    });
+    res.status(200).json(data.rows);
   } catch (err) {
-    res.status(500).json({message:"Failed to fetch inbox"})
+    res.status(500).json({ message: "Failed to fetch inbox" });
   }
 }
 
-const getAllMessages = async(req, res)=>{
-try{
-  let inbox_id = req.params.inbox_id;
-let query = `
-select * from messages where inbox_id = $1;
-` 
-let data = await client.query(query, [inbox_id]);
-res.status(200).json(data.rows)
-}catch(err){
-  res.status(500).json({message:"unable to fetch message"})
-}
-}
+const getAllMessages = async (req, res) => {
+  try {
+    let inbox_id = req.params.inbox_id;
+    let query = `select * from messages where inbox_id = $1;
+`;
+    let data = await client.query(query, [inbox_id]);
+    res.status(200).json(data.rows);
+  } catch (err) {
+    res.status(500).json({ message: "unable to fetch message" });
+  }
+};
 
+const markAsRead = async ({inbox_id, user_id}) => {
+  try {
+    let readQuery = `
+UPDATE MESSAGES
+SET MESSAGE_STATUS = 'read'
+WHERE INBOX_ID = $1 AND SENDER_ID != $2;
+`;
+console.log('inbox and user id  ' ,inbox_id , user_id)
+    let status = await client.query(readQuery, [inbox_id, user_id]);
+    console.log('query status ',status)
+    return true;
+  } catch (err) {
+    console.log(err)
+    return false;
+  }
+};
 
-
-module.exports = { uploadProfile, getUserById, searchUSers, sendMessage, getAllinbox, getAllMessages };
+module.exports = {
+  uploadProfile,
+  getUserById,
+  searchUSers,
+  sendMessage,
+  getAllinbox,
+  getAllMessages,markAsRead
+};

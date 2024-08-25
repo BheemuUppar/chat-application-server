@@ -1,5 +1,5 @@
 const {Server} = require('socket.io');
-const { sendMessage } = require('../controllers/user.controller');
+const { sendMessage, markAsRead } = require('../controllers/user.controller');
 
 // Initialize Socket.IO with CORS settings
  let   io ;
@@ -49,6 +49,11 @@ const { sendMessage } = require('../controllers/user.controller');
               }
               socket.emit("sent", messages);
           });
+
+          socket.on("read", async (data)=>{
+          let res = await markAsRead(data);
+          socket.emit('onMsgRead')
+          })
       
           socket.on("disconnect", () => {
               let index = onlineUsers.indexOf(userId);
