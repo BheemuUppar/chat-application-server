@@ -216,9 +216,9 @@ LEFT JOIN (
     AND sender_id <> $1
     GROUP BY inbox_id
 ) unread_counts ON unread_counts.inbox_id = i.inbox_id
-WHERE i.user1_id = $1 OR i.user2_id = $1;
- 
-    `;
+WHERE i.user1_id = $1 OR i.user2_id = $1
+ORDER BY m.sent_at DESC;  -- Sort by last_message_time in descending order
+    `;;
     let data = await client.query(query, [userid]);
 
     data.rows = data.rows.map((obj) => {

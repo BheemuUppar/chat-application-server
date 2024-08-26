@@ -25,7 +25,7 @@ const { sendMessage, markAsRead } = require('../controllers/user.controller');
           console.log("New socket connection:", socket.userId);
       
           onlineUsers.push(userId);
-          socket.broadcast.emit('onlineusers', onlineUsers);
+          io.emit('onlineusers', onlineUsers);
       
           socket.on("sendMessage", async (data) => {
               socket.join(data.inbox_id);
@@ -58,7 +58,8 @@ const { sendMessage, markAsRead } = require('../controllers/user.controller');
           socket.on("disconnect", () => {
               let index = onlineUsers.indexOf(userId);
               onlineUsers.splice(index, 1);
-              socket.broadcast.emit('onlineusers', onlineUsers);
+              // socket.broadcast.emit('onlineusers', onlineUsers);
+              io.emit('onlineusers', onlineUsers);
               console.log("Socket disconnected:", userId);
       
               // Remove from userSocketMap
