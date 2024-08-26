@@ -122,9 +122,7 @@ values($1, $2, $3)
     message_text,
   ]);
 
-  let fetchMessagesQuery = `
-SELECT * FROM MESSAGES WHERE INBOX_ID = $1
-`;
+  let fetchMessagesQuery = `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`
   let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
 
   return messages.rows;
@@ -240,8 +238,7 @@ WHERE i.user1_id = $1 OR i.user2_id = $1;
 const getAllMessages = async (req, res) => {
   try {
     let inbox_id = req.params.inbox_id;
-    let query = `select * from messages where inbox_id = $1;
-`;
+    let query = `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`;
     let data = await client.query(query, [inbox_id]);
     res.status(200).json(data.rows);
   } catch (err) {
