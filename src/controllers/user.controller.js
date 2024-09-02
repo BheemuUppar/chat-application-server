@@ -71,23 +71,11 @@ const searchUSers = async (req, res) => {
   if (isNaN(searchQuery)) {
     // searchQuery is not a number, so treat it as a string
     const str = "%" + searchQuery + "%";
-    query = `
-      SELECT user_id as contact_id,
-      name as contact_name,last_seen,
-      profile_path, email
- FROM users 
-      WHERE UPPER(name) LIKE UPPER($1) 
-         OR UPPER(email) LIKE UPPER($1)
-    `;
+    query = queries.searchUserBasedOnNameAndEmail;
     params = [str];
   } else {
     // searchQuery is a number, so treat it as an ID
-    query = `
-      SELECT * FROM users 
-      WHERE id = $1 
-         OR UPPER(name) LIKE UPPER($2) 
-         OR UPPER(email) LIKE UPPER($2)
-    `;
+    query = queries.searchUserBasedOnId;
     const str = "%" + searchQuery + "%";
     params = [parseInt(searchQuery, 10), str];
   }
@@ -113,115 +101,10 @@ async function getAllinbox(req, res) {
     let userid = req.params.user_id;
 
     // Query for one-to-one chats
-    let oneToOneQuery = `
-      SELECT 
-        i.inbox_id,
-        false AS isGroup,
-        CASE 
-          WHEN i.user1_id = $1 THEN u2.user_id
-          ELSE u1.user_id
-        END AS contact_id,
-        CASE 
-          WHEN i.user1_id = $1 THEN u2.name
-          ELSE u1.name
-        END AS contact_name,
-        CASE 
-          WHEN i.user1_id = $1 THEN u2.currentStatus
-          ELSE u1.currentStatus
-        END AS contact_status,
-        CASE 
-          WHEN i.user1_id = $1 THEN u2.last_seen
-          ELSE u1.last_seen
-        END AS contact_last_seen,
-        CASE 
-          WHEN i.user1_id = $1 THEN u2.profile_path
-          ELSE u1.profile_path
-        END AS profile_path,
-        m.message_text AS last_message,
-        m.sent_at AS last_message_time,
-        m.sender_id,
-        COALESCE(unread_counts.unread_count, 0) AS unread_count,
-        NULL AS group_members
-      FROM inbox i
-      LEFT JOIN users u1 ON i.user1_id = u1.user_id
-      LEFT JOIN users u2 ON i.user2_id = u2.user_id
-      LEFT JOIN (
-        SELECT 
-          m.inbox_id,
-          m.message_text,
-          m.sent_at,
-          m.sender_id
-        FROM messages m
-        JOIN (
-          SELECT inbox_id, MAX(sent_at) AS max_sent_at
-          FROM messages
-          GROUP BY inbox_id
-        ) latest_msg ON m.inbox_id = latest_msg.inbox_id AND m.sent_at = latest_msg.max_sent_at
-      ) m ON m.inbox_id = i.inbox_id
-      LEFT JOIN (
-        SELECT 
-          inbox_id,
-          COUNT(*) AS unread_count
-        FROM messages
-        WHERE message_status = 'unread'
-        AND sender_id <> $1
-        GROUP BY inbox_id
-      ) unread_counts ON unread_counts.inbox_id = i.inbox_id
-      WHERE i.user1_id = $1 OR i.user2_id = $1
-      GROUP BY i.inbox_id, u1.user_id, u2.user_id, u1.name, u2.name, u1.currentStatus, u2.currentStatus, u1.last_seen, u2.last_seen, u1.profile_path, u2.profile_path, m.message_text, m.sent_at, m.sender_id, unread_counts.unread_count
-    `;
+    let oneToOneQuery = queries.oneToOneInbox;
 
     // Query for group chats
-    let groupQuery = `
-   SELECT 
-    i.inbox_id,
-    true AS isGroup,
-    NULL AS contact_id,
-    i.name AS contact_name,  -- Group name
-    'Group' AS contact_status,
-    NULL AS contact_last_seen,
-    i.profile_path AS profile_path,  -- Group profile path
-    m.message_text AS last_message,
-    m.sent_at AS last_message_time,
-    m.sender_id,
-    -- Calculate unread count specifically for the logged-in user in group chats
-    COALESCE(unread_counts.unread_count, 0) AS unread_count,
-    -- Aggregate group members as JSON array
-    COALESCE(json_agg(DISTINCT gm.member_id) FILTER (WHERE gm.member_id IS NOT NULL), '[]'::json) AS group_members
-FROM inbox i
--- Get the latest message details for each inbox
-LEFT JOIN (
-    SELECT 
-        m.inbox_id,
-        m.message_text,
-        m.sent_at,
-        m.sender_id
-    FROM messages m
-    JOIN (
-        SELECT inbox_id, MAX(sent_at) AS max_sent_at
-        FROM messages
-        GROUP BY inbox_id
-    ) latest_msg ON m.inbox_id = latest_msg.inbox_id AND m.sent_at = latest_msg.max_sent_at
-) m ON m.inbox_id = i.inbox_id
--- Calculate unread messages specifically for the user in group chats using message_reads
-LEFT JOIN (
-    SELECT 
-        m.inbox_id,
-        COUNT(*) AS unread_count
-    FROM messages m
-    -- Join to check if the message is read by the specific user
-    LEFT JOIN message_reads mr ON m.message_id = mr.message_id AND mr.user_id = $1  -- $1 is the specific user ID
-    WHERE 
-        (mr.is_read = false OR mr.is_read IS NULL)  -- Count messages as unread if not marked as read
-        AND m.sender_id <> $1  -- Exclude messages sent by the current user
-    GROUP BY m.inbox_id
-) unread_counts ON unread_counts.inbox_id = i.inbox_id
--- Left join group members for group chat details
-LEFT JOIN group_members gm ON gm.inbox_id = i.inbox_id
-WHERE i.isGroup = true  -- Filter for group chats only
-GROUP BY i.inbox_id, i.name, i.profile_path, m.message_text, m.sent_at, m.sender_id, unread_counts.unread_count
-ORDER BY m.sent_at DESC;  -- Order by last message time
-`;
+    let groupQuery = queries.groupInbox;
 
     // Fetch one-to-one and group chat data
     let oneToOneData = await client.query(oneToOneQuery, [userid]);
@@ -264,11 +147,7 @@ const createGroup = async (req, res) => {
     }
     await client.query("BEGIN");
 
-    let groupCreationQuery = `
-    INSERT INTO INBOX (ISGROUP, NAME, CREATED_BY)
-    VALUES($1, $2, $3)
-    RETURNING inbox_id;
-    `;
+    let groupCreationQuery = queries.createGroupQuery;
 
     // this creates group with group name
     let newGroup = await client.query(groupCreationQuery, [
@@ -282,9 +161,7 @@ const createGroup = async (req, res) => {
     await updateGroupProfile(newInboxId, filePath);
     groupMembers.unshift(myUserId);
     for (let member of groupMembers) {
-      let insertMemberQuery = `
-        insert into group_members(inbox_id, member_id)
-        values ($1, $2);`;
+      let insertMemberQuery = queries.insertMemberToGroup;
       await client.query(insertMemberQuery, [newInboxId, member]);
     }
     await client.query("COMMIT");
@@ -307,11 +184,7 @@ const createGroup = async (req, res) => {
 };
 
 async function updateGroupProfile(inbox_id, filePath) {
-  let query = `
-UPDATE INBOX 
-SET PROFILE_PATH = $1
-WHERE INBOX_ID =$2;
-`;
+  let query = queries.updateGroupProfile;
   await client.query(query, [filePath, inbox_id]);
 }
 

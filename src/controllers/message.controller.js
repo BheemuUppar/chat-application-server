@@ -1,21 +1,19 @@
 const client = require("../db/connect/connections");
+const queries = require("../db/queries/Queries");
 
 const sendMessage = async (data) => {
   let sender_id = data.sender_id;
   let inboxData = await findInbox(data.sender_id, data.receiver_id);
   let message_text = data.message_text;
 
-  let sendMessageQuery = `
-    insert into messages (inbox_id, sender_id, message_text)
-    values($1, $2, $3)
-    `;
+  let sendMessageQuery = queries.sendMessageQuery;
   await client.query(sendMessageQuery, [
     inboxData.inbox_id,
     sender_id,
     message_text,
   ]);
 
-  let fetchMessagesQuery = `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`;
+  let fetchMessagesQuery = queries.fetchMessagesQuery;
   let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
 
   return messages.rows;
@@ -24,19 +22,12 @@ const sendMessage = async (data) => {
 };
 async function findInbox(userId1, userId2) {
   try {
-    let findInboxQuery = `
-            SELECT * FROM inbox 
-            WHERE (user1_id = $1 AND user2_id = $2) 
-            OR (user1_id = $2 AND user2_id = $1) `;
+    let findInboxQuery = queries.findInboxQuery;
 
     let inbox = await client.query(findInboxQuery, [userId1, userId2]);
 
     if (inbox.rows.length === 0) {
-      let createInboxQuery = `
-            INSERT INTO inbox (user1_id, user2_id)
-            VALUES ($1, $2)
-            RETURNING *
-            `;
+      let createInboxQuery = queries.createInboxQuery;
       let newInbox = await client.query(createInboxQuery, [userId1, userId2]);
 
       return newInbox.rows[0];
@@ -51,15 +42,7 @@ async function findInbox(userId1, userId2) {
 const getAllMessages = async (req, res) => {
   try {
     let inbox_id = req.params.inbox_id;
-    let query = `
-            SELECT 
-            m.*, 
-            u.name AS sender_name  -- Assuming 'name' is the column for the user's name in the users table
-            FROM messages m
-            JOIN users u ON m.sender_id = u.user_id  -- Join the messages with the users table to get sender details
-            WHERE m.inbox_id = $1
-            ORDER BY m.sent_at ASC;
-        `;
+    let query = queries.getAllMessagesQuery;
     let data = await client.query(query, [inbox_id]);
     res.status(200).json(data.rows);
   } catch (err) {
@@ -73,27 +56,12 @@ const markAsRead = async ({ inbox_id, user_id }) => {
     let inBox = await client.query(`select * from inbox where inbox_id = $1`, [
       inbox_id,
     ]);
-    console.log();
     if (inBox.rows[0].isgroup == false) {
-      let readQuery = `
-            UPDATE MESSAGES
-            SET MESSAGE_STATUS = 'read'
-            WHERE INBOX_ID = $1 AND SENDER_ID != $2;
-            `;
+      let readQuery = queries.chatMsgRead;
       let status = await client.query(readQuery, [inbox_id, user_id]);
       return true;
     } else {
-      let msgReadQuery = `
-            UPDATE message_reads
-        SET is_read = true
-        WHERE message_id IN (
-            SELECT message_id 
-            FROM messages 
-            WHERE inbox_id = $1  -- The ID of the inbox
-        )
-        AND user_id = $2;  -- The ID of the user
-    
-        `;
+      let msgReadQuery = queries.groupMsgRead;
       await client.query(msgReadQuery, [inbox_id, user_id]);
       return true;
     }
@@ -105,11 +73,7 @@ const markAsRead = async ({ inbox_id, user_id }) => {
 
 async function sendMessageToGroup(inbox_id, sender_id, message_text) {
   try {
-    let sendMessageQuery = `
-        insert into messages (inbox_id, sender_id, message_text, message_status)
-        values($1, $2, $3, 'read')
-        returning message_id;
-        `;
+    let sendMessageQuery = queries.sendMessageQuery;
     let data = await client.query(sendMessageQuery, [
       inbox_id,
       sender_id,
@@ -120,8 +84,7 @@ async function sendMessageToGroup(inbox_id, sender_id, message_text) {
     VALUES ($1, $2, false, null)
         `;
     let membersRows = await client.query(
-      `
-        select member_id from group_members
+      ` select member_id from group_members
         where inbox_id = $1
         `,
       [inbox_id]
@@ -138,4 +101,9 @@ async function sendMessageToGroup(inbox_id, sender_id, message_text) {
   }
 }
 
-module.exports = { sendMessage, getAllMessages , sendMessageToGroup, markAsRead};
+module.exports = {
+  sendMessage,
+  getAllMessages,
+  sendMessageToGroup,
+  markAsRead,
+};
