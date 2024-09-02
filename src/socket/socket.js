@@ -2,14 +2,11 @@ const { Server } = require("socket.io");
 const {
   sendMessage,
   markAsRead,
-  createGroup,
   sendMessageToGroup,
-} = require("../controllers/user.controller");
+} = require("../controllers/message.controller");
 const client = require("../db/connect/connections");
 const path = require("path");
 
-const fs = require("fs");
-const eventEmitter = require("../controllers/eventemitter");
 
 // Initialize Socket.IO with CORS settings
 let io;

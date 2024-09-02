@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 const upload = require("../db/storage/multerStorage");
 
-const { uploadProfile, getUserById, searchUSers, getAllinbox, getAllMessages, createGroup } = require("../controllers/user.controller");
+const { uploadProfile, getUserById, searchUSers, getAllinbox,createGroup } = require("../controllers/user.controller");
+const { getAllMessages } = require("../controllers/message.controller");
 
 router.post("/upload/profile", upload.single("file"), uploadProfile);
 
