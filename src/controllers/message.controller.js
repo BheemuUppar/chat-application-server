@@ -7,15 +7,19 @@ const sendMessage = async (data) => {
   let message_text = data.message_text;
 
   let sendMessageQuery = queries.sendMessageQuery;
-  await client.query(sendMessageQuery, [
+  let afterSent  = await client.query(sendMessageQuery, [
     inboxData.inbox_id,
     sender_id,
     message_text,
   ]);
+  console.log('some data', afterSent.rows)
 
   let fetchMessagesQuery = queries.fetchMessagesQuery;
   let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
-
+let neeMsg = messages.rows.filter((message)=>{
+  return message.message_id == afterSent.rows[0].message_id
+});
+console.log(neeMsg)
   return messages.rows;
 
   // let receiver_id = data.receiver_id;
@@ -61,6 +65,7 @@ const markAsRead = async ({ inbox_id, user_id }) => {
       let status = await client.query(readQuery, [inbox_id, user_id]);
       return true;
     } else {
+      
       let msgReadQuery = queries.groupMsgRead;
       await client.query(msgReadQuery, [inbox_id, user_id]);
       return true;

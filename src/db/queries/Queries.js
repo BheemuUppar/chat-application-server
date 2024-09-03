@@ -27,8 +27,9 @@ const queries = {
             OR  UPPER(EMAIL) LIKE UPPER($2);
           `,
   sendMessageQuery: `
-          insert into messages (inbox_id, sender_id, message_text)
-          values($1, $2, $3)
+          insert into messages (inbox_id, sender_id, message_text, message_status)
+          values($1, $2, $3, 'unread')
+          returning message_id, message_text, message_status;
           `,
   fetchMessagesQuery: `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`,
   findInboxQuery: `
@@ -65,11 +66,11 @@ const queries = {
           AND user_id = $2;  -- The ID of the user
       
           `,
-  sendMessageQuery: `
-          insert into messages (inbox_id, sender_id, message_text, message_status)
-          values($1, $2, $3, 'read')
-          returning message_id;
-          `,
+  // sendMessageQuery: `
+  //         insert into messages (inbox_id, sender_id, message_text, message_status)
+  //         values($1, $2, $3, 'read')
+  //         returning message_id;
+  //         `,
   searchUserBasedOnNameAndEmail: `
     SELECT user_id as contact_id,
         name as contact_name,last_seen,
