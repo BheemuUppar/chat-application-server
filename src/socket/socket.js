@@ -3,10 +3,12 @@ const {
   sendMessage,
   markAsRead,
   sendMessageToGroup,
+  getMimeType,
 } = require("../controllers/message.controller");
 const client = require("../db/connect/connections");
 const path = require("path");
 const fs = require("fs");
+const { convertImagetoString } = require("../controllers/user.controller");
 
 // Initialize Socket.IO with CORS settings
 let io;
@@ -93,11 +95,12 @@ function socketInit(httpServer) {
     });
 
     socket.on("sendToGroup", async (data) => {
-      console.log("sending...");
+      console.log("sending...", data);
       let res = await sendMessageToGroup(
         data.inbox_id,
         data.sender_id,
-        data.message_text
+        data.message_text,
+        data
       );
       let membersRows = await client.query(
         `
@@ -120,6 +123,20 @@ function socketInit(httpServer) {
       let messagesRows = await client.query(fetchMessagesQuery, [
         data.inbox_id,
       ]);
+
+    messagesRows.rows =  messagesRows.rows.map((message)=>{
+        if(!message.message_file){
+          return message
+        }
+        else{
+          let imgUrl = convertImagetoString(message.message_file);
+          message.file_type = getMimeType(message.message_file)
+          message.message_file = imgUrl
+          return message
+        }
+      });
+
+      console.log(messagesRows.rows)
 
       socket.emit("sent", messagesRows.rows);
     });

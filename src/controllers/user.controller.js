@@ -202,4 +202,5 @@ module.exports = {
   searchUSers,
   getAllinbox,
   createGroup,
+  convertImagetoString
 };
