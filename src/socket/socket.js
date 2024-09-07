@@ -6,7 +6,7 @@ const {
 } = require("../controllers/message.controller");
 const client = require("../db/connect/connections");
 const path = require("path");
-
+const fs = require("fs");
 
 // Initialize Socket.IO with CORS settings
 let io;
@@ -35,21 +35,19 @@ function socketInit(httpServer) {
 
     socket.on("sendMessage", async (data) => {
       socket.join(data.inbox_id);
-
-      let messages = await sendMessage(data);
-
-      // Send confirmation to the sender
-
-      // Fetch the receiver's socket ID using userSocketMap
-      const receiverSocketId = userSocketMap[data.receiver_id];
-
-      // Send message received notification to the receiver
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit("messageReceviced", messages);
-      } else {
-        console.log("Receiver not connected");
-      }
-      socket.emit("sent", messages);
+    
+        let messages = await sendMessage(data);
+        // Send confirmation to the sender
+        // Fetch the receiver's socket ID using userSocketMap
+        const receiverSocketId = userSocketMap[data.receiver_id];
+        // Send message received notification to the receiver
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit("messageReceviced", messages);
+        } else {
+          console.log("Receiver not connected");
+        }
+        socket.emit("sent", messages);
+   
     });
 
     socket.on("read", async (data) => {
@@ -113,15 +111,17 @@ function socketInit(httpServer) {
       members.forEach((id) => {
         const receiverSocketId = userSocketMap[id];
         if (receiverSocketId && id != data.sender_id) {
-          io.to(receiverSocketId).emit("messageReceviced", '');
+          io.to(receiverSocketId).emit("messageReceviced", "");
         } else {
           console.log("Receiver not connected");
         }
       });
       let fetchMessagesQuery = `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`;
-      let messagesRows = await client.query(fetchMessagesQuery, [data.inbox_id]);
-        
-        socket.emit("sent", messagesRows.rows);
+      let messagesRows = await client.query(fetchMessagesQuery, [
+        data.inbox_id,
+      ]);
+
+      socket.emit("sent", messagesRows.rows);
     });
   });
 }

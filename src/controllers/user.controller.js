@@ -110,6 +110,14 @@ async function getAllinbox(req, res) {
     let oneToOneData = await client.query(oneToOneQuery, [userid]);
     let groupData = await client.query(groupQuery, [userid]);
 
+   groupData.rows =  groupData.rows.map((group)=>{
+    group.group_members = group.group_members.map((member)=>{
+      member.profile_path =  convertImagetoString(member.profile_path)
+      return member
+    })
+    return group
+    })
+
     // Merge both results
     let combinedData = [...oneToOneData.rows, ...groupData.rows];
 

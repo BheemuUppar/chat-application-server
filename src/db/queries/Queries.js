@@ -142,56 +142,66 @@ const queries = {
       WHERE i.user1_id = $1 OR i.user2_id = $1
       GROUP BY i.inbox_id, u1.user_id, u2.user_id, u1.name, u2.name, u1.currentStatus, u2.currentStatus, u1.last_seen, u2.last_seen, u1.profile_path, u2.profile_path, m.message_text, m.sent_at, m.sender_id, unread_counts.unread_count
     `,
-  groupInbox: `
-   SELECT 
-    i.inbox_id,
-    true AS isGroup,
-    NULL AS contact_id,
-    i.name AS contact_name,  -- Group name
-    'Group' AS contact_status,
-    NULL AS contact_last_seen,
-    i.profile_path AS profile_path,  -- Group profile path
-    m.message_text AS last_message,
-    m.sent_at AS last_message_time,
-    m.sender_id,
-    -- Calculate unread count specifically for the logged-in user in group chats
-    COALESCE(unread_counts.unread_count, 0) AS unread_count,
-    -- Aggregate group members as JSON array
-    COALESCE(json_agg(DISTINCT gm.member_id) FILTER (WHERE gm.member_id IS NOT NULL), '[]'::json) AS group_members
-FROM inbox i
--- Get the latest message details for each inbox
-LEFT JOIN (
+    groupInbox: `
     SELECT 
-        m.inbox_id,
-        m.message_text,
-        m.sent_at,
-        m.sender_id
-    FROM messages m
-    JOIN (
-        SELECT inbox_id, MAX(sent_at) AS max_sent_at
-        FROM messages
-        GROUP BY inbox_id
-    ) latest_msg ON m.inbox_id = latest_msg.inbox_id AND m.sent_at = latest_msg.max_sent_at
-) m ON m.inbox_id = i.inbox_id
--- Calculate unread messages specifically for the user in group chats using message_reads
-LEFT JOIN (
-    SELECT 
-        m.inbox_id,
-        COUNT(*) AS unread_count
-    FROM messages m
-    -- Join to check if the message is read by the specific user
-    LEFT JOIN message_reads mr ON m.message_id = mr.message_id AND mr.user_id = $1  -- $1 is the specific user ID
-    WHERE 
-        (mr.is_read = false OR mr.is_read IS NULL)  -- Count messages as unread if not marked as read
-        AND m.sender_id <> $1  -- Exclude messages sent by the current user
-    GROUP BY m.inbox_id
-) unread_counts ON unread_counts.inbox_id = i.inbox_id
--- Left join group members for group chat details
-LEFT JOIN group_members gm ON gm.inbox_id = i.inbox_id
-WHERE i.isGroup = true  -- Filter for group chats only
-GROUP BY i.inbox_id, i.name, i.profile_path, m.message_text, m.sent_at, m.sender_id, unread_counts.unread_count
-ORDER BY m.sent_at DESC;  -- Order by last message time
-`,
+     i.inbox_id,
+     true AS isGroup,
+     NULL AS contact_id,
+     i.name AS contact_name,  -- Group name
+     'Group' AS contact_status,
+     NULL AS contact_last_seen,
+     i.profile_path AS profile_path,  -- Group profile path
+     m.message_text AS last_message,
+     m.sent_at AS last_message_time,
+     m.sender_id,
+     -- Calculate unread count specifically for the logged-in user in group chats
+     COALESCE(unread_counts.unread_count, 0) AS unread_count,
+     -- Aggregate group members as JSONB array with member_id and profile_path
+     COALESCE(
+         jsonb_agg(
+             DISTINCT jsonb_build_object(
+                 'id', gm.member_id,
+                 'profile_path', u.profile_path
+             )
+         ) FILTER (WHERE gm.member_id IS NOT NULL), 
+         '[]'::jsonb  -- Ensure the fallback value is of type jsonb
+     ) AS group_members
+ FROM inbox i
+ -- Get the latest message details for each inbox
+ LEFT JOIN (
+     SELECT 
+         m.inbox_id,
+         m.message_text,
+         m.sent_at,
+         m.sender_id
+     FROM messages m
+     JOIN (
+         SELECT inbox_id, MAX(sent_at) AS max_sent_at
+         FROM messages
+         GROUP BY inbox_id
+     ) latest_msg ON m.inbox_id = latest_msg.inbox_id AND m.sent_at = latest_msg.max_sent_at
+ ) m ON m.inbox_id = i.inbox_id
+ -- Calculate unread messages specifically for the user in group chats using message_reads
+ LEFT JOIN (
+     SELECT 
+         m.inbox_id,
+         COUNT(*) AS unread_count
+     FROM messages m
+     -- Join to check if the message is read by the specific user
+     LEFT JOIN message_reads mr ON m.message_id = mr.message_id AND mr.user_id = $1  -- $1 is the specific user ID
+     WHERE 
+         (mr.is_read = false OR mr.is_read IS NULL)  -- Count messages as unread if not marked as read
+         AND m.sender_id <> $1  -- Exclude messages sent by the current user
+     GROUP BY m.inbox_id
+ ) unread_counts ON unread_counts.inbox_id = i.inbox_id
+ -- Left join group members and users to fetch profile_path for each member
+ LEFT JOIN group_members gm ON gm.inbox_id = i.inbox_id
+ LEFT JOIN users u ON gm.member_id = u.user_id  -- Ensure this matches the correct column name in the users table
+ WHERE i.isGroup = true  -- Filter for group chats only
+ GROUP BY i.inbox_id, i.name, i.profile_path, m.message_text, m.sent_at, m.sender_id, unread_counts.unread_count
+ ORDER BY m.sent_at DESC;  -- Order by last message time
+ `,
+ 
 
   createGroupQuery: `
     INSERT INTO INBOX (ISGROUP, NAME, CREATED_BY)

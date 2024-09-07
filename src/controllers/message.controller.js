@@ -1,8 +1,49 @@
 const client = require("../db/connect/connections");
 const queries = require("../db/queries/Queries");
+const path = require('path');
+const fs = require('fs');
+
+
 
 const sendMessage = async (data) => {
-  let sender_id = data.sender_id;
+ 
+    if (data.files_data) {
+    let files =   data.files_data.map((file=>{
+        const savePath = path.join(__dirname, `../../assets/messages`);
+        const filePath = path.join(savePath, Date.now() + '_' +file.name);
+       fs.writeFileSync(filePath, Buffer.from(file.fileData));
+       file.name = filePath;
+       file.fileData = filePath
+       return file
+       
+      }));
+      let sender_id = data.sender_id;
+      let inboxData = await findInbox(data.sender_id, data.receiver_id);
+      let message_text = data.message_text == '' ? null : data.message_text;
+
+    
+      let sendMessageQuery = `
+          insert into messages (inbox_id, sender_id, message_text, message_status, message_file)
+          values($1, $2, $3, 'unread', $4)
+          returning message_id, message_text, message_status;
+          `;
+      let afterSent  = await client.query(sendMessageQuery, [
+        inboxData.inbox_id,
+        sender_id,
+        message_text,
+        files[0].fileData
+      ]);
+    
+      let fetchMessagesQuery = queries.fetchMessagesQuery;
+      let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
+    let neeMsg = messages.rows.filter((message)=>{
+      return message.message_id == afterSent.rows[0].message_id
+    });
+      return messages.rows;
+    }
+ 
+  else{
+    let sender_id = data.sender_id;
   let inboxData = await findInbox(data.sender_id, data.receiver_id);
   let message_text = data.message_text;
 
@@ -12,15 +53,15 @@ const sendMessage = async (data) => {
     sender_id,
     message_text,
   ]);
-  console.log('some data', afterSent.rows)
 
   let fetchMessagesQuery = queries.fetchMessagesQuery;
   let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
 let neeMsg = messages.rows.filter((message)=>{
   return message.message_id == afterSent.rows[0].message_id
 });
-console.log(neeMsg)
   return messages.rows;
+  }
+  
 
   // let receiver_id = data.receiver_id;
 };
