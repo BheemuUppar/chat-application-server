@@ -143,6 +143,7 @@ const getAllMessages = async (req, res) => {
       else{
           let imgUrl = convertImagetoString(message.message_file);
           message.file_name = message.message_file.split("messages\\")[1].split('_')[1];
+          
           message.mime_type = getMimeType(message.message_file)
           message.message_file = imgUrl;
           return message
@@ -180,7 +181,6 @@ async function sendMessageToGroup(inbox_id, sender_id, message_text, payload) {
     let filePath
     let metaData
     if (payload &&  payload.files_data) {
-      console.log('some data ' ,payload.files_data)
       let files = payload.files_data.map((file) => {
         const savePath = path.join(__dirname, `../../assets/messages`);
        filePath = path.join(savePath, Date.now() + "_" + file.name);

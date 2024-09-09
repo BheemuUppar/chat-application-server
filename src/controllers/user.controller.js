@@ -224,6 +224,7 @@ async function fetchGroupData(inbox_id){
     inbox.isgroup,
     inbox.name,
     inbox.created_at,
+    inbox.profile_path,
     -- Aggregate user details for created_by (DISTINCT ensures no duplication)
     json_agg(
         DISTINCT jsonb_build_object(
@@ -231,28 +232,30 @@ async function fetchGroupData(inbox_id){
             'name', u.name,
             'email', u.email,
             'mobile', u.mobile,
-            'profile', u.profile_path
+            'profile_path', u.profile_path
         )
     ) AS created_by,
     -- Aggregate group member details
     json_agg(
-        json_build_object(
+       DISTINCT jsonb_build_object(
             'user_id', gm_user.user_id,
             'name', gm_user.name,
             'email', gm_user.email,
             'mobile', gm_user.mobile,
-            'profile', gm_user.profile_path
+            'profile_path', gm_user.profile_path
         )
     ) AS group_members,
     -- Aggregate messages where message_file is not null
     json_agg(
-        json_build_object(
+        DISTINCT jsonb_build_object(
             'message_id', m.message_id,
             'sender_id', m.sender_id,
             'message_text', m.message_text,
             'message_file', m.message_file,
             'file_type', m.file_type,
-            'sent_at', m.sent_at
+            'sent_at', m.sent_at,
+            'file_size',m.file_size,
+            'file_type', m.file_type
         )
     ) AS messages
 FROM 
@@ -274,7 +277,24 @@ WHERE
 GROUP BY 
     inbox.inbox_id, inbox.isgroup, inbox.name, inbox.created_at;`;
     let data = await client.query(query, [inbox_id]);
-    return data.rows
+    return data.rows.map(obj=>{
+      obj.profile_path = convertImagetoString(obj.profile_path)
+      obj.created_by = obj.created_by.map(user=>{
+        user.profile_path = convertImagetoString(user.profile_path)
+        return user
+      })
+      obj.group_members = obj.group_members.map(user=>{
+        user.profile_path = convertImagetoString(user.profile_path)
+        return user
+      })
+      obj.messages = obj.messages.map((msg)=>{
+        msg.file_name = msg.message_file.split("messages\\")[1].split('_')[1]
+        msg.message_file = convertImagetoString( msg.message_file);
+
+        return msg
+      })
+      return obj
+    })
 }
 
 module.exports = {
