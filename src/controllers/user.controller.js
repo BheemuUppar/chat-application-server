@@ -196,11 +196,93 @@ async function updateGroupProfile(inbox_id, filePath) {
   await client.query(query, [filePath, inbox_id]);
 }
 
+async function getInboxInfo(req, res){
+try {
+  const inbox_id = req.params.inbox_id;
+  let inbox = await  client.query(`select * from inbox where inbox_id = $1`, [inbox_id]);
+  if(inbox.length == 0){
+    res.status(400).json({message:"Bad Request"})
+    return
+  }
+  const isGroup = inbox.rows[0].isgroup;
+  console.log(isGroup)
+  if(isGroup){
+    let data = await fetchGroupData(inbox_id);
+    res.status(200).json(data)
+  }else{
+
+  }
+  res.json(inbox.rows)
+} catch (error) {
+  
+}
+}
+
+async function fetchGroupData(inbox_id){
+  let query =`SELECT 
+    inbox.inbox_id,
+    inbox.isgroup,
+    inbox.name,
+    inbox.created_at,
+    -- Aggregate user details for created_by (DISTINCT ensures no duplication)
+    json_agg(
+        DISTINCT jsonb_build_object(
+            'user_id', u.user_id,
+            'name', u.name,
+            'email', u.email,
+            'mobile', u.mobile,
+            'profile', u.profile_path
+        )
+    ) AS created_by,
+    -- Aggregate group member details
+    json_agg(
+        json_build_object(
+            'user_id', gm_user.user_id,
+            'name', gm_user.name,
+            'email', gm_user.email,
+            'mobile', gm_user.mobile,
+            'profile', gm_user.profile_path
+        )
+    ) AS group_members,
+    -- Aggregate messages where message_file is not null
+    json_agg(
+        json_build_object(
+            'message_id', m.message_id,
+            'sender_id', m.sender_id,
+            'message_text', m.message_text,
+            'message_file', m.message_file,
+            'file_type', m.file_type,
+            'sent_at', m.sent_at
+        )
+    ) AS messages
+FROM 
+    inbox
+-- Join with users table for the creator of the inbox
+JOIN 
+    users u ON inbox.created_by = u.user_id
+-- Join with group_members table to get group members
+LEFT JOIN 
+    group_members gm ON gm.inbox_id = inbox.inbox_id
+-- Join with users table to get user details for each group member using member_id
+LEFT JOIN 
+    users gm_user ON gm.member_id = gm_user.user_id
+-- Join with messages table to get message details
+LEFT JOIN 
+    messages m ON m.inbox_id = inbox.inbox_id AND m.message_file IS NOT NULL
+WHERE 
+    inbox.inbox_id = $1
+GROUP BY 
+    inbox.inbox_id, inbox.isgroup, inbox.name, inbox.created_at;`;
+    let data = await client.query(query, [inbox_id]);
+    return data.rows
+}
+
 module.exports = {
   uploadProfile,
   getUserById,
   searchUSers,
   getAllinbox,
   createGroup,
-  convertImagetoString
+  convertImagetoString,
+  getInboxInfo
 };

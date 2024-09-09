@@ -44,11 +44,11 @@ function socketInit(httpServer) {
         const receiverSocketId = userSocketMap[data.receiver_id];
         // Send message received notification to the receiver
         if (receiverSocketId) {
-          io.to(receiverSocketId).emit("messageReceviced", messages);
+          io.to(receiverSocketId).emit("messageReceviced", '');
         } else {
           console.log("Receiver not connected");
         }
-        socket.emit("sent", messages);
+        socket.emit("sent", '');
    
     });
 
@@ -119,24 +119,24 @@ function socketInit(httpServer) {
           console.log("Receiver not connected");
         }
       });
-      let fetchMessagesQuery = `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`;
-      let messagesRows = await client.query(fetchMessagesQuery, [
-        data.inbox_id,
-      ]);
+    //   let fetchMessagesQuery = `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`;
+    //   let messagesRows = await client.query(fetchMessagesQuery, [
+    //     data.inbox_id,
+    //   ]);
 
-    messagesRows.rows =  messagesRows.rows.map((message)=>{
-        if(!message.message_file){
-          return message
-        }
-        else{
-          let imgUrl = convertImagetoString(message.message_file);
-          message.file_type = path.extname(message.message_file).toLowerCase().replace('.', '')
-          message.message_file = imgUrl
-          return message
-        }
-      });
+    // messagesRows.rows =  messagesRows.rows.map((message)=>{
+    //     if(!message.message_file){
+    //       return message
+    //     }
+    //     else{
+    //       let imgUrl = convertImagetoString(message.message_file);
+    //       message.file_type = path.extname(message.message_file).toLowerCase().replace('.', '')
+    //       message.message_file = imgUrl
+    //       return message
+    //     }
+    //   });
 
-      socket.emit("sent", messagesRows.rows);
+      socket.emit("sent", '');
     });
   });
 }
