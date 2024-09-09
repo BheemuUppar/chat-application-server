@@ -19,8 +19,8 @@ const sendMessage = async (data) => {
     let message_text = data.message_text == "" ? null : data.message_text;
 
     let sendMessageQuery = `
-          insert into messages (inbox_id, sender_id, message_text, message_status, message_file)
-          values($1, $2, $3, 'unread', $4)
+          insert into messages (inbox_id, sender_id, message_text, message_status, message_file, file_type)
+          values($1, $2, $3, 'unread', $4, $5)
           returning message_id, message_text, message_status;
           `;
     let afterSent = await client.query(sendMessageQuery, [
@@ -28,13 +28,14 @@ const sendMessage = async (data) => {
       sender_id,
       message_text,
       files[0].fileData,
+      getMimeType(files[0].fileData)
     ]);
 
     let fetchMessagesQuery = queries.fetchMessagesQuery;
     let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
-    let neeMsg = messages.rows.filter((message) => {
-      return message.message_id == afterSent.rows[0].message_id;
-    });
+    // let neeMsg = messages.rows.filter((message) => {
+    //   return message.message_id == afterSent.rows[0].message_id;
+    // });
     return messages.rows.map((message)=>{
       if(!message.message_file){
         return message
@@ -60,14 +61,15 @@ const sendMessage = async (data) => {
 
     let fetchMessagesQuery = queries.fetchMessagesQuery;
     let messages = await client.query(fetchMessagesQuery, [inboxData.inbox_id]);
-    let neeMsg = messages.rows.filter((message) => {
-      return message.message_id == afterSent.rows[0].message_id;
-    });
-    return messages.rows.map((message)=>{
+    // let neeMsg = messages.rows.filter((message) => {
+    //   return message.message_id == afterSent.rows[0].message_id;
+    // });
+    return messages.rows.map(async (message)=>{
       if(!message.message_file){
         return message
       }
       else{
+       
         let imgUrl = convertImagetoString(message.message_file);
         message.file_type = getMimeType(message.message_file)
         message.message_file = imgUrl
@@ -77,6 +79,30 @@ const sendMessage = async (data) => {
   }
 
   // let receiver_id = data.receiver_id;
+};
+
+const getFileMetadata = (filePath) => {
+  return new Promise((resolve, reject) => {
+    // Check if the file exists
+    fs.stat(filePath, (err, stats) => {
+      if (err) {
+        return reject(`Error fetching file metadata: ${err.message}`);
+      }
+
+      // Extract metadata
+      const metadata = {
+        fileName: path.basename(filePath),
+        fileSize: stats.size, // in bytes
+        createdAt: stats.birthtime,
+        modifiedAt: stats.mtime,
+        isDirectory: stats.isDirectory(),
+        isFile: stats.isFile(),
+        fileType: path.extname(filePath),
+      };
+
+      resolve(metadata);
+    });
+  });
 };
 async function findInbox(userId1, userId2) {
   try {
@@ -107,9 +133,12 @@ const getAllMessages = async (req, res) => {
         return message
       }
       else{
+        
           let imgUrl = convertImagetoString(message.message_file);
-          message.file_type = getMimeType(message.message_file)
-          message.message_file = imgUrl
+          message.file_name = message.message_file.split("messages\\")[1].split('_')[1];
+          message.file_type = path.extname(message.message_file).toLowerCase().replace('.', '')
+          message.mime_type = getMimeType(message.message_file)
+          message.message_file = imgUrl;
           return message
       }
     });

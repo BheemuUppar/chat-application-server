@@ -130,13 +130,11 @@ function socketInit(httpServer) {
         }
         else{
           let imgUrl = convertImagetoString(message.message_file);
-          message.file_type = getMimeType(message.message_file)
+          message.file_type = path.extname(message.message_file).toLowerCase().replace('.', '')
           message.message_file = imgUrl
           return message
         }
       });
-
-      console.log(messagesRows.rows)
 
       socket.emit("sent", messagesRows.rows);
     });
