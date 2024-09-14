@@ -3,6 +3,7 @@ const queries = require("../db/queries/Queries");
 const path = require("path");
 const fs = require("fs");
 const { convertImagetoString } = require("./user.controller");
+const { deleteFile } = require("../utils/utils");
 
 const sendMessage = async (data) => {
   let metaData;
@@ -273,8 +274,16 @@ const deleteMessage = async (message_id) => {
     if (!message_id) {
       return false;
     }
+    let messageData = await client.query(`select message_file from messages where message_id = $1`, [message_id]);
+    if(messageData.rows[0].message_file != null  ){
+      let result  = await deleteFile(messageData.rows[0].message_file)
+      if(!result){
+        return false
+      }
+    }
     const query = queries.deleteMessage;
     const query2 = `delete from message_reads where message_id = $1`;
+    
     await client.query(query2, [message_id]);
     await client.query(query, [message_id]);
     return true;
@@ -283,6 +292,7 @@ const deleteMessage = async (message_id) => {
     return false;
   }
 };
+
 
 module.exports = {
   sendMessage,
