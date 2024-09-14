@@ -3,13 +3,9 @@ const {
   sendMessage,
   markAsRead,
   sendMessageToGroup,
-  getMimeType,
   deleteMessage,
 } = require("../controllers/message.controller");
 const client = require("../db/connect/connections");
-const path = require("path");
-const fs = require("fs");
-const { convertImagetoString } = require("../controllers/user.controller");
 
 // Initialize Socket.IO with CORS settings
 let io;
@@ -126,35 +122,38 @@ function socketInit(httpServer) {
     socket.on("deleteMessage", async (data) => {
       const message_id = data.message_id;
       const inbox_id = data.inbox_id;
-     let result = await  deleteMessage(message_id);
-     let inboxData = await client.query(`select * from inbox where inbox_id = $1 `,  [inbox_id]);
-     let inbox = inboxData.rows[0];
+      let result = await deleteMessage(message_id);
+      let inboxData = await client.query(
+        `select * from inbox where inbox_id = $1 `,
+        [inbox_id]
+      );
+      let inbox = inboxData.rows[0];
 
-     if(result == false){
-      socket.emit("failedToDeleteMessage", "");
-     }else{
-      // socket.emit('msgDeleted', '');
-      let users = []
-      if(inbox.isgroup == false){
-       users = [inbox.user1_id , inbox.user2_id]
-     }else{
-      let groupMembers = await client.query(`select member_id from group_members where inbox_id = $1 `,  [inbox_id]);
-      users = groupMembers.rows.map((member)=>{
-        return member.member_id;
-      })
-     }
-     users.forEach((id) => {
-      const receiverSocketId = userSocketMap[id];
-      if (receiverSocketId && id != data.sender_id) {
-        io.to(receiverSocketId).emit("msgDeleted", "");
+      if (result == false) {
+        socket.emit("failedToDeleteMessage", "");
       } else {
-        console.log("Receiver not connected");
+        // socket.emit('msgDeleted', '');
+        let users = [];
+        if (inbox.isgroup == false) {
+          users = [inbox.user1_id, inbox.user2_id];
+        } else {
+          let groupMembers = await client.query(
+            `select member_id from group_members where inbox_id = $1 `,
+            [inbox_id]
+          );
+          users = groupMembers.rows.map((member) => {
+            return member.member_id;
+          });
+        }
+        users.forEach((id) => {
+          const receiverSocketId = userSocketMap[id];
+          if (receiverSocketId && id != data.sender_id) {
+            io.to(receiverSocketId).emit("msgDeleted", "");
+          } else {
+            console.log("Receiver not connected");
+          }
+        });
       }
-    });
-
-
-
-     }
     });
   });
 }
