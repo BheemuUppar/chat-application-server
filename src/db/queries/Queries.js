@@ -162,9 +162,7 @@ const queries = {
     m.sender_id,
     m.message_file,  -- Added
     m.file_type,     -- Added
-    -- Calculate unread count specifically for the logged-in user in group chats
     COALESCE(unread_counts.unread_count, 0) AS unread_count,
-    -- Aggregate group members as JSONB array with member_id and profile_path
     COALESCE(
         jsonb_agg(
             DISTINCT jsonb_build_object(
@@ -174,42 +172,45 @@ const queries = {
         ) FILTER (WHERE gm.member_id IS NOT NULL), 
         '[]'::jsonb  -- Ensure the fallback value is of type jsonb
     ) AS group_members
-  FROM inbox i
-  -- Get the latest message details for each inbox
-  LEFT JOIN (
-      SELECT 
-          m.inbox_id,
-          m.message_text,
-          m.sent_at,
-          m.sender_id,
-          m.message_file,  -- Added
-          m.file_type      -- Added
-      FROM messages m
-      JOIN (
-          SELECT inbox_id, MAX(sent_at) AS max_sent_at
-          FROM messages
-          GROUP BY inbox_id
-      ) latest_msg ON m.inbox_id = latest_msg.inbox_id AND m.sent_at = latest_msg.max_sent_at
-  ) m ON m.inbox_id = i.inbox_id
-  -- Calculate unread messages specifically for the user in group chats using message_reads
-  LEFT JOIN (
-      SELECT 
-          m.inbox_id,
-          COUNT(*) AS unread_count
-      FROM messages m
-      -- Join to check if the message is read by the specific user
-      LEFT JOIN message_reads mr ON m.message_id = mr.message_id AND mr.user_id = $1  -- $1 is the specific user ID
-      WHERE 
-          (mr.is_read = false OR mr.is_read IS NULL)  -- Count messages as unread if not marked as read
-          AND m.sender_id <> $1  -- Exclude messages sent by the current user
-      GROUP BY m.inbox_id
-  ) unread_counts ON unread_counts.inbox_id = i.inbox_id
-  -- Left join group members and users to fetch profile_path for each member
-  LEFT JOIN group_members gm ON gm.inbox_id = i.inbox_id
-  LEFT JOIN users u ON gm.member_id = u.user_id  -- Ensure this matches the correct column name in the users table
-  WHERE i.isGroup = true  -- Filter for group chats only
-  GROUP BY i.inbox_id, i.name, i.profile_path, m.message_text, m.sent_at, m.sender_id, m.message_file, m.file_type, unread_counts.unread_count
-  ORDER BY m.sent_at DESC;  -- Order by last message time
+FROM 
+    inbox i
+-- Get the latest message details for each inbox
+LEFT JOIN (
+    SELECT 
+        m.inbox_id,
+        m.message_text,
+        m.sent_at,
+        m.sender_id,
+        m.message_file,  -- Added
+        m.file_type      -- Added
+    FROM messages m
+    JOIN (
+        SELECT inbox_id, MAX(sent_at) AS max_sent_at
+        FROM messages
+        GROUP BY inbox_id
+    ) latest_msg ON m.inbox_id = latest_msg.inbox_id AND m.sent_at = latest_msg.max_sent_at
+) m ON m.inbox_id = i.inbox_id
+-- Calculate unread messages specifically for the user in group chats using message_reads
+LEFT JOIN (
+    SELECT 
+        m.inbox_id,
+        COUNT(*) AS unread_count
+    FROM messages m
+    LEFT JOIN message_reads mr ON m.message_id = mr.message_id AND mr.user_id = $1  -- $1 is the specific user ID
+    WHERE 
+        (mr.is_read = false OR mr.is_read IS NULL)  -- Count messages as unread if not marked as read
+        AND m.sender_id <> $1  -- Exclude messages sent by the current user
+    GROUP BY m.inbox_id
+) unread_counts ON unread_counts.inbox_id = i.inbox_id
+-- Left join group members and users to fetch profile_path for each member
+LEFT JOIN group_members gm ON gm.inbox_id = i.inbox_id
+LEFT JOIN users u ON gm.member_id = u.user_id  -- Ensure this matches the correct column name in the users table
+-- Ensure the user is a member of the group
+WHERE i.isGroup = true
+AND gm.member_id = $1  -- Filter to include only groups where the specific user is a member
+GROUP BY i.inbox_id, i.name, i.profile_path, m.message_text, m.sent_at, m.sender_id, m.message_file, m.file_type, unread_counts.unread_count
+ORDER BY m.sent_at DESC;  -- Order by last message time
+
 `,
 
 
@@ -226,6 +227,8 @@ UPDATE INBOX
 SET PROFILE_PATH = $1
 WHERE INBOX_ID =$2;
 `,
+
+deleteMessage : `delete from messages where message_id = $1;`
 };
 
 module.exports = queries;

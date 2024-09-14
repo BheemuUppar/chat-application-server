@@ -4,6 +4,7 @@ const {
   markAsRead,
   sendMessageToGroup,
   getMimeType,
+  deleteMessage,
 } = require("../controllers/message.controller");
 const client = require("../db/connect/connections");
 const path = require("path");
@@ -37,19 +38,18 @@ function socketInit(httpServer) {
 
     socket.on("sendMessage", async (data) => {
       socket.join(data.inbox_id);
-    
-        let messages = await sendMessage(data);
-        // Send confirmation to the sender
-        // Fetch the receiver's socket ID using userSocketMap
-        const receiverSocketId = userSocketMap[data.receiver_id];
-        // Send message received notification to the receiver
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit("messageReceviced", '');
-        } else {
-          console.log("Receiver not connected");
-        }
-        socket.emit("sent", '');
-   
+
+      let messages = await sendMessage(data);
+      // Send confirmation to the sender
+      // Fetch the receiver's socket ID using userSocketMap
+      const receiverSocketId = userSocketMap[data.receiver_id];
+      // Send message received notification to the receiver
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageReceviced", "");
+      } else {
+        console.log("Receiver not connected");
+      }
+      socket.emit("sent", "");
     });
 
     socket.on("read", async (data) => {
@@ -119,24 +119,42 @@ function socketInit(httpServer) {
           console.log("Receiver not connected");
         }
       });
-    //   let fetchMessagesQuery = `SELECT * FROM messages WHERE inbox_id = $1 ORDER BY sent_at ASC;`;
-    //   let messagesRows = await client.query(fetchMessagesQuery, [
-    //     data.inbox_id,
-    //   ]);
 
-    // messagesRows.rows =  messagesRows.rows.map((message)=>{
-    //     if(!message.message_file){
-    //       return message
-    //     }
-    //     else{
-    //       let imgUrl = convertImagetoString(message.message_file);
-    //       message.file_type = path.extname(message.message_file).toLowerCase().replace('.', '')
-    //       message.message_file = imgUrl
-    //       return message
-    //     }
-    //   });
+      socket.emit("sent", "");
+    });
 
-      socket.emit("sent", '');
+    socket.on("deleteMessage", async (data) => {
+      const message_id = data.message_id;
+      const inbox_id = data.inbox_id;
+     let result = await  deleteMessage(message_id);
+     let inboxData = await client.query(`select * from inbox where inbox_id = $1 `,  [inbox_id]);
+     let inbox = inboxData.rows[0];
+
+     if(result == false){
+      socket.emit("failedToDeleteMessage", "");
+     }else{
+      // socket.emit('msgDeleted', '');
+      let users = []
+      if(inbox.isgroup == false){
+       users = [inbox.user1_id , inbox.user2_id]
+     }else{
+      let groupMembers = await client.query(`select member_id from group_members where inbox_id = $1 `,  [inbox_id]);
+      users = groupMembers.rows.map((member)=>{
+        return member.member_id;
+      })
+     }
+     users.forEach((id) => {
+      const receiverSocketId = userSocketMap[id];
+      if (receiverSocketId && id != data.sender_id) {
+        io.to(receiverSocketId).emit("msgDeleted", "");
+      } else {
+        console.log("Receiver not connected");
+      }
+    });
+
+
+
+     }
     });
   });
 }

@@ -5,16 +5,16 @@ const fs = require("fs");
 const { convertImagetoString } = require("./user.controller");
 
 const sendMessage = async (data) => {
- let metaData
- let filePath 
+  let metaData;
+  let filePath;
   if (data.files_data) {
     let files = data.files_data.map((file) => {
       const savePath = path.join(__dirname, `../../assets/messages`);
-       filePath = path.join(savePath, Date.now() + "_" + file.name);
+      filePath = path.join(savePath, Date.now() + "_" + file.name);
       fs.writeFileSync(filePath, Buffer.from(file.fileData));
       file.name = filePath;
       file.fileData = filePath;
-      metaData= fs.statSync(filePath);
+      metaData = fs.statSync(filePath);
       return file;
     });
     let sender_id = data.sender_id;
@@ -26,15 +26,14 @@ const sendMessage = async (data) => {
           values($1, $2, $3, 'unread', $4, $5, $6)
           returning message_id, message_text, message_status;
           `;
-         
+
     let afterSent = await client.query(sendMessageQuery, [
       inboxData.inbox_id,
       sender_id,
       message_text,
       files[0].fileData,
-      path.extname(filePath).replace('.', ''),
-      metaData.size
-      
+      path.extname(filePath).replace(".", ""),
+      metaData.size,
     ]);
 
     let fetchMessagesQuery = queries.fetchMessagesQuery;
@@ -53,7 +52,7 @@ const sendMessage = async (data) => {
     //     return message
     //   }
     // });
-    return true
+    return true;
   } else {
     let sender_id = data.sender_id;
     let inboxData = await findInbox(data.sender_id, data.receiver_id);
@@ -76,14 +75,14 @@ const sendMessage = async (data) => {
     //     return message
     //   }
     //   else{
-       
+
     //     let imgUrl = convertImagetoString(message.message_file);
     //     message.file_type = getMimeType(message.message_file)
     //     message.message_file = imgUrl
     //     return message
     //   }
     // });
-    return true
+    return true;
   }
 
   // let receiver_id = data.receiver_id;
@@ -112,6 +111,7 @@ const getFileMetadata = (filePath) => {
     });
   });
 };
+
 async function findInbox(userId1, userId2) {
   try {
     let findInboxQuery = queries.findInboxQuery;
@@ -136,22 +136,22 @@ const getAllMessages = async (req, res) => {
     let inbox_id = req.params.inbox_id;
     let query = queries.getAllMessagesQuery;
     let data = await client.query(query, [inbox_id]);
-    data.rows =  data.rows.map((message)=>{
-      if(!message.message_file){
-        return message
-      }
-      else{
-          let imgUrl = convertImagetoString(message.message_file);
-          message.file_name = message.message_file.split("messages\\")[1].split('_')[1];
-          
-          message.mime_type = getMimeType(message.message_file)
-          message.message_file = imgUrl;
-          return message
+    data.rows = data.rows.map((message) => {
+      if (!message.message_file) {
+        return message;
+      } else {
+        let imgUrl = convertImagetoString(message.message_file);
+        message.file_name = message.message_file
+          .split("messages\\")[1]
+          .split("_")[1];
+
+        message.mime_type = getMimeType(message.message_file);
+        message.message_file = imgUrl;
+        return message;
       }
     });
     res.status(200).json(data.rows);
   } catch (err) {
-    console.error("Error fetching messages:", err);
     res.status(500).json({ message: "Unable to fetch messages" });
   }
 };
@@ -178,47 +178,46 @@ const markAsRead = async ({ inbox_id, user_id }) => {
 
 async function sendMessageToGroup(inbox_id, sender_id, message_text, payload) {
   try {
-    let filePath
-    let metaData
-    if (payload &&  payload.files_data) {
+    let filePath;
+    let metaData;
+    if (payload && payload.files_data) {
       let files = payload.files_data.map((file) => {
         const savePath = path.join(__dirname, `../../assets/messages`);
-       filePath = path.join(savePath, Date.now() + "_" + file.name);
+        filePath = path.join(savePath, Date.now() + "_" + file.name);
         fs.writeFileSync(filePath, Buffer.from(file.fileData));
         file.name = filePath;
         file.fileData = filePath;
-        metaData= fs.statSync(filePath);
+        metaData = fs.statSync(filePath);
         return file;
       });
       let sendMessageQuery = ` insert into messages (inbox_id, sender_id, message_text, message_status, message_file, file_type, file_size )
          values($1, $2, $3, 'unread', $4, $5, $6)
          returning message_id, message_text, message_status;`;
       let data = await client.query(sendMessageQuery, [
-      inbox_id,
-      sender_id,
-      message_text,
-      files[0].fileData,
-      path.extname(filePath).replace('.', ''),
-      metaData.size
-
-    ]);
-    let msgRead = `
+        inbox_id,
+        sender_id,
+        message_text,
+        files[0].fileData,
+        path.extname(filePath).replace(".", ""),
+        metaData.size,
+      ]);
+      let msgRead = `
         INSERT INTO message_reads (message_id, user_id, is_read, read_at)
     VALUES ($1, $2, false, null)
         `;
-    let membersRows = await client.query(
-      ` select member_id from group_members
+      let membersRows = await client.query(
+        ` select member_id from group_members
         where inbox_id = $1
         `,
-      [inbox_id]
-    );
-    let members = membersRows.rows.map((member) => member.member_id);
+        [inbox_id]
+      );
+      let members = membersRows.rows.map((member) => member.member_id);
 
-    for (let id of members) {
-      await client.query(msgRead, [data.rows[0].message_id, id]);
-    }
-    return true;
-    }else{
+      for (let id of members) {
+        await client.query(msgRead, [data.rows[0].message_id, id]);
+      }
+      return true;
+    } else {
       let sendMessageQuery = queries.sendMessageQuery;
       let data = await client.query(sendMessageQuery, [
         inbox_id,
@@ -236,14 +235,12 @@ async function sendMessageToGroup(inbox_id, sender_id, message_text, payload) {
         [inbox_id]
       );
       let members = membersRows.rows.map((member) => member.member_id);
-  
+
       for (let id of members) {
         await client.query(msgRead, [data.rows[0].message_id, id]);
       }
       return true;
     }
-
-    
   } catch (error) {
     console.log(error);
     return false;
@@ -253,28 +250,45 @@ async function sendMessageToGroup(inbox_id, sender_id, message_text, payload) {
 function getMimeType(filePath) {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
-    case '.jpg':
-    case '.jpeg':
-      return 'image/jpeg';
-    case '.png':
-      return 'image/png';
-    case '.pdf':
-      return 'application/pdf';
-    case '.doc':
-    case '.docx':
-      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    case '.txt':
-      return 'text/plain';
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".pdf":
+      return "application/pdf";
+    case ".doc":
+    case ".docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case ".txt":
+      return "text/plain";
     // Add more cases for different file types as needed
     default:
-      return 'application/octet-stream'; // Default for unknown types
+      return "application/octet-stream"; // Default for unknown types
   }
 }
+
+const deleteMessage = async (message_id) => {
+  try {
+    if (!message_id) {
+      return false;
+    }
+    const query = queries.deleteMessage;
+    const query2 = `delete from message_reads where message_id = $1`;
+    await client.query(query2, [message_id]);
+    await client.query(query, [message_id]);
+    return true;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+};
 
 module.exports = {
   sendMessage,
   getAllMessages,
   sendMessageToGroup,
   markAsRead,
-  getMimeType
+  getMimeType,
+  deleteMessage,
 };

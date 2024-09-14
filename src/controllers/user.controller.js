@@ -83,7 +83,6 @@ const searchUSers = async (req, res) => {
   try {
     let data = await client.query(query, params);
     data = data.rows.map((user) => {
-      console.log(user.profile_path);
       user.profile_path = convertImagetoString(user.profile_path);
       return user;
     });
@@ -300,38 +299,42 @@ GROUP BY
 // 
 async function fetchContactData(user_id, inbox_id){
   let query =`SELECT 
-    i.inbox_id, i.isgroup, 
-    (SELECT u.user_id FROM users u WHERE u.user_id = $1 LIMIT 1) AS user_id ,
-    (SELECT u.name FROM users u WHERE u.user_id =  $1 LIMIT 1) AS name ,
-    (SELECT u.email FROM users u WHERE u.user_id = $1 LIMIT 1) AS email ,
+    i.inbox_id, 
+    i.isgroup, 
+    (SELECT u.user_id FROM users u WHERE u.user_id = $1 LIMIT 1) AS user_id,
+    (SELECT u.name FROM users u WHERE u.user_id = $1 LIMIT 1) AS name,
+    (SELECT u.email FROM users u WHERE u.user_id = $1 LIMIT 1) AS email,
     (SELECT u.mobile FROM users u WHERE u.user_id = $1 LIMIT 1) AS mobile,
     (SELECT u.profile_path FROM users u WHERE u.user_id = $1 LIMIT 1) AS profile_path,
-	 json_agg(
-        DISTINCT jsonb_build_object(
-            'message_id', m.message_id,
-            'sender_id', m.sender_id,
-            'message_text', m.message_text,
-            'message_file', m.message_file,
-            'file_type', m.file_type,
-            'sent_at', m.sent_at,
-            'file_size',m.file_size,
-            'file_type', m.file_type
-        )
+    COALESCE(
+        jsonb_agg(
+            DISTINCT jsonb_build_object(
+                'message_id', m.message_id,
+                'sender_id', m.sender_id,
+                'message_text', m.message_text,
+                'message_file', m.message_file,
+                'file_type', m.file_type,
+                'sent_at', m.sent_at,
+                'file_size', m.file_size
+            )
+        ) FILTER (WHERE m.message_id IS NOT NULL),
+        '[]'::jsonb  -- Ensure an empty array if no messages
     ) AS messages
-	-- Replace with specific columns
 FROM 
     inbox i
 LEFT JOIN 
     messages m ON m.inbox_id = i.inbox_id AND m.message_file IS NOT NULL
 WHERE 
     i.inbox_id = $2
-group by i.inbox_id;`;
+GROUP BY 
+    i.inbox_id;
+`;
     let data = await client.query(query, [user_id, inbox_id]);
-
     return data.rows.map(obj=>{
       obj.profile_path = convertImagetoString(obj.profile_path)
     
       obj.messages = obj.messages.map((msg)=>{
+        console.log(msg)
         msg.file_name = msg.message_file.split("messages\\")[1].split('_')[1]
         msg.message_file =   convertImagetoString( msg.message_file);
 
@@ -351,9 +354,9 @@ async function fetchChatInfo(req, res){
     }
     let data = await fetchContactData(user_id, inbox_id);
     res.status(200).json(data)
-    res.json()
+  
   } catch (error) {
-    
+    res.status(500).json({message:"Something went wrong"})
   }
 }
 
