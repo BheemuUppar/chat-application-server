@@ -13,6 +13,9 @@ let onlineUsers = [];
 const userSocketMap = {}; // Store user ID to socket ID mapping
 function socketInit(httpServer) {
   io = new Server(httpServer, {
+    pingTimeout:60000 ,
+    pingInterval: 25000,
+    maxHttpBufferSize: 1e8, // 100 MB (increase if needed)
     cors: {
       origin: "*", // Replace with your Angular app URL
       methods: ["GET", "POST"],
@@ -33,19 +36,23 @@ function socketInit(httpServer) {
     io.emit("onlineusers", onlineUsers);
 
     socket.on("sendMessage", async (data) => {
-      socket.join(data.inbox_id);
-
-      let messages = await sendMessage(data);
-      // Send confirmation to the sender
-      // Fetch the receiver's socket ID using userSocketMap
-      const receiverSocketId = userSocketMap[data.receiver_id];
-      // Send message received notification to the receiver
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit("messageReceviced", "");
-      } else {
-        console.log("Receiver not connected");
-      }
-      socket.emit("sent", "");
+     try {
+       // socket.join(data.inbox_id);
+       console.log('message sending.. ', )
+       let messages = await sendMessage(data);
+       // Send confirmation to the sender
+       // Fetch the receiver's socket ID using userSocketMap
+       const receiverSocketId = userSocketMap[data.receiver_id];
+       // Send message received notification to the receiver
+       if (receiverSocketId) {
+         io.to(receiverSocketId).emit("messageReceviced", "");
+       } else {
+         console.log("Receiver not connected");
+       }
+       socket.emit("sent", "");
+     } catch (error) {
+      console.log(error)
+     }
     });
 
     socket.on("read", async (data) => {
@@ -91,7 +98,6 @@ function socketInit(httpServer) {
     });
 
     socket.on("sendToGroup", async (data) => {
-      console.log("sending...", data);
       let res = await sendMessageToGroup(
         data.inbox_id,
         data.sender_id,

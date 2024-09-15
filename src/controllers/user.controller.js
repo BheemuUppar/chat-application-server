@@ -49,17 +49,45 @@ const getUserById = async (req, res) => {
   res.status(200).json({ data: data.rows[0] });
 };
 
-function convertImagetoString(profile_path) {
-  if (!profile_path) {
+function convertImagetoString(filePath) {
+  if (!filePath) {
     return null;
   }
+
   try {
-    let fileData = fs.readFileSync(profile_path);
-    // Convert file data to Base64
+    const fileData = fs.readFileSync(filePath);
     const base64Data = fileData.toString("base64");
-    const extension = path.extname(profile_path).slice(1);
-    return `data:image/${extension};base64,${base64Data}`;
+    const extension = path.extname(filePath).slice(1);
+
+    // Define MIME types for different file formats
+    const mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'bmp': 'image/bmp',
+      'tiff': 'image/tiff',
+      'svg': 'image/svg+xml',
+      'pdf': 'application/pdf',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'mp4': 'video/mp4',
+      'avi': 'video/x-msvideo',
+      'mov': 'video/quicktime',
+      'mkv': 'video/x-matroska',
+      'flv': 'video/x-flv',
+      'wmv': 'video/x-ms-wmv',
+      'webm': 'video/webm'
+    };
+
+    const mimeType = mimeTypes[extension] || 'application/octet-stream';
+    return `data:${mimeType};base64,${base64Data}`;
   } catch (err) {
+    console.error('Error reading file:', err);
     return null;
   }
 }
@@ -334,7 +362,6 @@ GROUP BY
       obj.profile_path = convertImagetoString(obj.profile_path)
     
       obj.messages = obj.messages.map((msg)=>{
-        console.log(msg)
         msg.file_name = msg.message_file.split("messages\\")[1].split('_')[1]
         msg.message_file =   convertImagetoString( msg.message_file);
 
