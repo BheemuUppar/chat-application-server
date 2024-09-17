@@ -11,7 +11,7 @@ const uploadProfile = async (req, res) => {
   }
   let file = req.file.path;
   let userId = req.body.id;
-
+  await deleteProfileFile(userId);
   let query = queries.setProfilePath;
   await client.query(query, [file, userId]);
   let result = await client.query(queries.finduserById, [userId]);
@@ -61,33 +61,33 @@ function convertImagetoString(filePath) {
 
     // Define MIME types for different file formats
     const mimeTypes = {
-      'jpg': 'image/jpeg',
-      'jpeg': 'image/jpeg',
-      'png': 'image/png',
-      'gif': 'image/gif',
-      'bmp': 'image/bmp',
-      'tiff': 'image/tiff',
-      'svg': 'image/svg+xml',
-      'pdf': 'application/pdf',
-      'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'xls': 'application/vnd.ms-excel',
-      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'ppt': 'application/vnd.ms-powerpoint',
-      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'mp4': 'video/mp4',
-      'avi': 'video/x-msvideo',
-      'mov': 'video/quicktime',
-      'mkv': 'video/x-matroska',
-      'flv': 'video/x-flv',
-      'wmv': 'video/x-ms-wmv',
-      'webm': 'video/webm'
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      bmp: "image/bmp",
+      tiff: "image/tiff",
+      svg: "image/svg+xml",
+      pdf: "application/pdf",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ppt: "application/vnd.ms-powerpoint",
+      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      mp4: "video/mp4",
+      avi: "video/x-msvideo",
+      mov: "video/quicktime",
+      mkv: "video/x-matroska",
+      flv: "video/x-flv",
+      wmv: "video/x-ms-wmv",
+      webm: "video/webm",
     };
 
-    const mimeType = mimeTypes[extension] || 'application/octet-stream';
+    const mimeType = mimeTypes[extension] || "application/octet-stream";
     return `data:${mimeType};base64,${base64Data}`;
   } catch (err) {
-    console.error('Error reading file:', err);
+    console.error("Error reading file:", err);
     return null;
   }
 }
@@ -137,13 +137,13 @@ async function getAllinbox(req, res) {
     let oneToOneData = await client.query(oneToOneQuery, [userid]);
     let groupData = await client.query(groupQuery, [userid]);
 
-   groupData.rows =  groupData.rows.map((group)=>{
-    group.group_members = group.group_members.map((member)=>{
-      member.profile_path =  convertImagetoString(member.profile_path)
-      return member
-    })
-    return group
-    })
+    groupData.rows = groupData.rows.map((group) => {
+      group.group_members = group.group_members.map((member) => {
+        member.profile_path = convertImagetoString(member.profile_path);
+        return member;
+      });
+      return group;
+    });
 
     // Merge both results
     let combinedData = [...oneToOneData.rows, ...groupData.rows];
@@ -223,30 +223,29 @@ async function updateGroupProfile(inbox_id, filePath) {
   await client.query(query, [filePath, inbox_id]);
 }
 
-async function getInboxInfo(req, res){
-try {
-  const inbox_id = req.params.inbox_id;
-  let inbox = await  client.query(`select * from inbox where inbox_id = $1`, [inbox_id]);
-  if(inbox.length == 0){
-    res.status(400).json({message:"Bad Request"})
-    return
-  }
-  const isGroup = inbox.rows[0].isgroup;
-  console.log(isGroup)
-  if(isGroup){
-    let data = await fetchGroupData(inbox_id);
-    res.status(200).json(data)
-  }else{
-
-  }
-  res.json(inbox.rows)
-} catch (error) {
-  
+async function getInboxInfo(req, res) {
+  try {
+    const inbox_id = req.params.inbox_id;
+    let inbox = await client.query(`select * from inbox where inbox_id = $1`, [
+      inbox_id,
+    ]);
+    if (inbox.length == 0) {
+      res.status(400).json({ message: "Bad Request" });
+      return;
+    }
+    const isGroup = inbox.rows[0].isgroup;
+    console.log(isGroup);
+    if (isGroup) {
+      let data = await fetchGroupData(inbox_id);
+      res.status(200).json(data);
+    } else {
+    }
+    res.json(inbox.rows);
+  } catch (error) {}
 }
-}
 
-async function fetchGroupData(inbox_id){
-  let query =`SELECT 
+async function fetchGroupData(inbox_id) {
+  let query = `SELECT 
     inbox.inbox_id,
     inbox.isgroup,
     inbox.name,
@@ -303,30 +302,30 @@ WHERE
     inbox.inbox_id = $1
 GROUP BY 
     inbox.inbox_id, inbox.isgroup, inbox.name, inbox.created_at;`;
-    let data = await client.query(query, [inbox_id]);
-    return data.rows.map(obj=>{
-      obj.profile_path = convertImagetoString(obj.profile_path)
-      obj.created_by = obj.created_by.map(user=>{
-        user.profile_path = convertImagetoString(user.profile_path)
-        return user
-      })
-      obj.group_members = obj.group_members.map(user=>{
-        user.profile_path = convertImagetoString(user.profile_path)
-        return user
-      })
-      obj.messages = obj.messages.map((msg)=>{
-        msg.file_name = msg.message_file.split("messages\\")[1].split('_')[1]
-        msg.message_file = convertImagetoString( msg.message_file);
+  let data = await client.query(query, [inbox_id]);
+  return data.rows.map((obj) => {
+    obj.profile_path = convertImagetoString(obj.profile_path);
+    obj.created_by = obj.created_by.map((user) => {
+      user.profile_path = convertImagetoString(user.profile_path);
+      return user;
+    });
+    obj.group_members = obj.group_members.map((user) => {
+      user.profile_path = convertImagetoString(user.profile_path);
+      return user;
+    });
+    obj.messages = obj.messages.map((msg) => {
+      msg.file_name = msg.message_file.split("messages\\")[1].split("_")[1];
+      msg.message_file = convertImagetoString(msg.message_file);
 
-        return msg
-      })
-      return obj
-    })
+      return msg;
+    });
+    return obj;
+  });
 }
 
-// 
-async function fetchContactData(user_id, inbox_id){
-  let query =`SELECT 
+//
+async function fetchContactData(user_id, inbox_id) {
+  let query = `SELECT 
     i.inbox_id, 
     i.isgroup, 
     (SELECT u.user_id FROM users u WHERE u.user_id = $1 LIMIT 1) AS user_id,
@@ -357,33 +356,40 @@ WHERE
 GROUP BY 
     i.inbox_id;
 `;
-    let data = await client.query(query, [user_id, inbox_id]);
-    return data.rows.map(obj=>{
-      obj.profile_path = convertImagetoString(obj.profile_path)
-    
-      obj.messages = obj.messages.map((msg)=>{
-        msg.file_name = msg.message_file.split("messages\\")[1].split('_')[1]
-        msg.message_file =   convertImagetoString( msg.message_file);
+  let data = await client.query(query, [user_id, inbox_id]);
+  return data.rows.map((obj) => {
+    obj.profile_path = convertImagetoString(obj.profile_path);
 
-        return msg
-      })
-      return obj
-    })
+    obj.messages = obj.messages.map((msg) => {
+      msg.file_name = msg.message_file.split("messages\\")[1].split("_")[1];
+      msg.message_file = convertImagetoString(msg.message_file);
+
+      return msg;
+    });
+    return obj;
+  });
 }
 
-async function fetchChatInfo(req, res){
+async function fetchChatInfo(req, res) {
   try {
-    let user_id = req.params.user_id
-    let inbox_id = req.params.inbox_id
-    if(!inbox_id || !user_id){
-      res.status(400).json({message:"Bad Request"})
-      return
+    let user_id = req.params.user_id;
+    let inbox_id = req.params.inbox_id;
+    if (!inbox_id || !user_id) {
+      res.status(400).json({ message: "Bad Request" });
+      return;
     }
     let data = await fetchContactData(user_id, inbox_id);
-    res.status(200).json(data)
-  
+    res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({message:"Something went wrong"})
+    res.status(500).json({ message: "Something went wrong" });
+  }
+}
+
+async function deleteProfileFile(id) {
+  let query = `select * from users where user_id = $1`;
+  let result = await client.query(query, [id]);
+  if (result.rows[0].profile_path != null) {
+    fs.unlinkSync(result.rows[0].profile_path);
   }
 }
 
@@ -395,5 +401,5 @@ module.exports = {
   createGroup,
   convertImagetoString,
   getInboxInfo,
-  fetchChatInfo
+  fetchChatInfo,
 };

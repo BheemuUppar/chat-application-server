@@ -133,7 +133,7 @@ const getAllMessages = async (req, res) => {
         let imgUrl = convertImagetoString(message.message_file);
         message.file_name = message.message_file
           .split("messages\\")[1]
-          .split("_")[1];
+          .split(/_(.+)/)[1];
 
         message.mime_type = getMimeType(message.message_file);
         message.message_file = imgUrl;
