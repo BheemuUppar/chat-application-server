@@ -44,7 +44,7 @@ const queries = {
   getAllMessagesQuery: `
                   SELECT 
                   m.*, 
-                  u.name AS sender_name  -- Assuming 'name' is the column for the user's name in the users table
+                  u.name AS sender_name, u.profile_path  -- Assuming 'name' is the column for the user's name in the users table
                   FROM messages m
                   JOIN users u ON m.sender_id = u.user_id  -- Join the messages with the users table to get sender details
                   WHERE m.inbox_id = $1
@@ -149,7 +149,20 @@ const queries = {
   `,
   
   groupInbox: `
-  SELECT 
+  WITH group_members_data AS (
+    SELECT 
+        gm.inbox_id,
+        jsonb_agg(
+            jsonb_build_object(
+                'id', gm.member_id,
+                'profile_path', u.profile_path
+            )
+        ) AS group_members
+    FROM group_members gm
+    LEFT JOIN users u ON gm.member_id = u.user_id
+    GROUP BY gm.inbox_id
+)
+SELECT 
     i.inbox_id,
     true AS isGroup,
     NULL AS contact_id,
@@ -163,15 +176,7 @@ const queries = {
     m.message_file,  -- Added
     m.file_type,     -- Added
     COALESCE(unread_counts.unread_count, 0) AS unread_count,
-    COALESCE(
-        jsonb_agg(
-            DISTINCT jsonb_build_object(
-                'id', gm.member_id,
-                'profile_path', u.profile_path
-            )
-        ) FILTER (WHERE gm.member_id IS NOT NULL), 
-        '[]'::jsonb  -- Ensure the fallback value is of type jsonb
-    ) AS group_members
+    COALESCE(gmd.group_members, '[]'::jsonb) AS group_members  -- Get group members from subquery
 FROM 
     inbox i
 -- Get the latest message details for each inbox
@@ -202,14 +207,18 @@ LEFT JOIN (
         AND m.sender_id <> $1  -- Exclude messages sent by the current user
     GROUP BY m.inbox_id
 ) unread_counts ON unread_counts.inbox_id = i.inbox_id
--- Left join group members and users to fetch profile_path for each member
-LEFT JOIN group_members gm ON gm.inbox_id = i.inbox_id
-LEFT JOIN users u ON gm.member_id = u.user_id  -- Ensure this matches the correct column name in the users table
+-- Fetch pre-aggregated group members for each inbox
+LEFT JOIN group_members_data gmd ON gmd.inbox_id = i.inbox_id
 -- Ensure the user is a member of the group
 WHERE i.isGroup = true
-AND gm.member_id = $1  -- Filter to include only groups where the specific user is a member
-GROUP BY i.inbox_id, i.name, i.profile_path, m.message_text, m.sent_at, m.sender_id, m.message_file, m.file_type, unread_counts.unread_count
-ORDER BY m.sent_at DESC;  -- Order by last message time
+AND EXISTS (
+    SELECT 1 
+    FROM group_members gm2 
+    WHERE gm2.inbox_id = i.inbox_id 
+    AND gm2.member_id = $1  -- Ensure the user is a member of the group
+)
+GROUP BY i.inbox_id, i.name, i.profile_path, m.message_text, m.sent_at, m.sender_id, m.message_file, m.file_type, unread_counts.unread_count, gmd.group_members
+ORDER BY m.sent_at DESC;
 
 `,
 

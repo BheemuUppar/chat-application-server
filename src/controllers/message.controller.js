@@ -127,6 +127,7 @@ const getAllMessages = async (req, res) => {
     let query = queries.getAllMessagesQuery;
     let data = await client.query(query, [inbox_id]);
     data.rows = data.rows.map((message) => {
+      message.profile_path = convertImagetoString(message.profile_path);
       if (!message.message_file) {
         return message;
       } else {
