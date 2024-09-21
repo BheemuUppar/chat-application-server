@@ -155,7 +155,8 @@ const queries = {
         jsonb_agg(
             jsonb_build_object(
                 'id', gm.member_id,
-                'profile_path', u.profile_path
+                'profile_path', u.profile_path,
+                'name', u.name 
             )
         ) AS group_members
     FROM group_members gm
