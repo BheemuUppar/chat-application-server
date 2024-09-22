@@ -173,7 +173,12 @@ async function getAllinbox(req, res) {
 const createGroup = async (req, res) => {
   try {
     let { myUserId, groupName, groupMembers } = req.body;
-    let filePath = req.file.path;
+    let filePath
+    if(req.file){
+    filePath = req.file.path;
+    }else{
+      filePath = null
+    }
     groupMembers = JSON.parse(groupMembers);
     // let { myUserId, groupName, groupMembers } = req.body;
     if (!myUserId || !groupName || !groupMembers) {
@@ -234,14 +239,16 @@ async function getInboxInfo(req, res) {
       return;
     }
     const isGroup = inbox.rows[0].isgroup;
-    console.log(isGroup);
+   console.log('is group ', isGroup)
     if (isGroup) {
       let data = await fetchGroupData(inbox_id);
-      res.status(200).json(data);
+      return res.status(200).json(data);
     } else {
     }
     res.json(inbox.rows);
-  } catch (error) {}
+  } catch (error) {
+    console.log(error)
+  }
 }
 
 async function fetchGroupData(inbox_id) {
@@ -314,8 +321,8 @@ GROUP BY
       return user;
     });
     obj.messages = obj.messages.map((msg) => {
-      msg.file_name = msg.message_file.split("messages\\")[1].split("_")[1];
-      msg.message_file = convertImagetoString(msg.message_file);
+      msg.file_name =  msg.message_file ? msg.message_file.split("messages\\")[1].split("_")[1] : null;
+      msg.message_file = msg.message_file ?  convertImagetoString(msg.message_file) : null;
 
       return msg;
     });

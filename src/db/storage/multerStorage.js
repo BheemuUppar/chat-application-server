@@ -21,39 +21,8 @@ const upload = multer({
 //   }
 }); // 'image' is the name of the field in the form
 
-// Check file type function
-function checkFileType(file, cb) {
-  // Allowed extensions
-  const filetypes = /jpeg|jpg|png|gif/;
-  // Check extension
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Check mime type
-  const mimetype = filetypes.test(file.mimetype);
 
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb('Error: Images Only!');
-  }
-}
 
-// Route for image upload
-// app.post('/upload', (req, res) => {
-//   upload(req, res, (err) => {
-//     if (err) {
-//       res.status(400).json({ message: err });
-//     } else {
-//       if (req.file == undefined) {
-//         res.status(400).json({ message: 'No file selected!' });
-//       } else {
-//         res.status(200).json({
-//           message: 'File uploaded successfully!',
-//           file: `uploads/${req.file.filename}`
-//         });
-//       }
-//     }
-//   });
-// });
 
 module.exports = upload
 
