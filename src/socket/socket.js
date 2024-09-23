@@ -11,6 +11,7 @@ const client = require("../db/connect/connections");
 let io;
 let onlineUsers = [];
 const userSocketMap = {}; // Store user ID to socket ID mapping
+const typingTracker  = []
 function socketInit(httpServer) {
   io = new Server(httpServer, {
     pingTimeout:60000 ,
@@ -63,14 +64,18 @@ function socketInit(httpServer) {
     socket.on("disconnect", async () => {
       try {
         let index = onlineUsers.indexOf(userId);
+        // remove from typingTracker
+        typingTracker = typingTracker.filter((obj)=>{
+          return obj.user_id != userId;
+        })
         onlineUsers.splice(index, 1);
         // socket.broadcast.emit('onlineusers', onlineUsers);
         io.emit("onlineusers", onlineUsers);
         console.log("Socket disconnected:", userId);
 
-        let query = `UPDATE users
-  SET last_seen = CURRENT_TIMESTAMP
-  WHERE user_id = $1;`;
+              let query = `UPDATE users
+        SET last_seen = CURRENT_TIMESTAMP
+        WHERE user_id = $1;`;
 
         await client.query(query, [userId]);
         // Remove from userSocketMap
@@ -161,6 +166,34 @@ function socketInit(httpServer) {
         });
       }
     });
+
+    socket.on("startTyping", async (data)=>{
+        if(data.is_typing ){
+          if(findIndex(data) == -1){
+            typingTracker.push(data);
+          }
+        }else{
+         let index =  findIndex(data)
+          if(index >=0){
+            typingTracker.splice(index ,1);
+          }
+        }
+         data.to.forEach((id)=>{
+           if(onlineUsers.includes(id.toString())){
+             let socketId = userSocketMap[id];
+             let temp = typingTracker.filter(obj=>{
+                  return obj.to.includes(id)
+             })
+             io.to(socketId).emit('typing', temp)
+              }
+         })
+    })
+  });
+}
+
+function findIndex(data){
+ return typingTracker.findIndex((obj)=>{
+    return obj.inbox_id == data.inbox_id && obj.user_id == data.user_id
   });
 }
 
