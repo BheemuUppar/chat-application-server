@@ -6,7 +6,11 @@ const queries = require("../db/queries/Queries");
 const register = async (req, res) => {
   let { name, email, mobile, password } = req.body;
   let query = queries.registerUser;
+
   try {
+    if(!name || !email || !mobile || password){
+      res.status(409).json({ message: "Invalid payload" });
+    }
     // Check if user with email exists
     let users = await client.query(queries.findUserByEmail, [email]);
 
