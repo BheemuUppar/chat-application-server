@@ -4,8 +4,12 @@ const client = new Client({
   connectionString:"postgresql://chat-application_owner:2jR7UDrgMGtv@ep-bitter-bonus-a5bdozgu.us-east-2.aws.neon.tech/chat-application?sslmode=require"
 })
 client.connect(function(err) {
+try {
   if (err) throw err;
   console.log("pl/sql DB Connected!");
+} catch (error) {
+  console.log("DB connection closed...")
+}
 });
 
 module.exports = client;

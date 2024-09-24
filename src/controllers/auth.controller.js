@@ -8,8 +8,9 @@ const register = async (req, res) => {
   let query = queries.registerUser;
 
   try {
-    if(!name || !email || !mobile || password){
+    if(!name || !email || !mobile || !password){
       res.status(409).json({ message: "Invalid payload" });
+      return
     }
     // Check if user with email exists
     let users = await client.query(queries.findUserByEmail, [email]);
@@ -30,7 +31,7 @@ const register = async (req, res) => {
     }
   } catch (error) {
     console.error(error); // Log the actual error
-    res.status(500).json({ message: "Something broke" });
+    res.status(500).json({ message: "may be email and mobile exist!" });
   }
 };
 const login = async (req, res) => {
