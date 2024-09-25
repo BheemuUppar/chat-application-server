@@ -1,7 +1,7 @@
 const { Client } = require('pg');
 const { connectionString } = require('pg/lib/defaults');
 const client = new Client({
-  connectionString:"postgresql://chat-application_owner:2jR7UDrgMGtv@ep-bitter-bonus-a5bdozgu.us-east-2.aws.neon.tech/chat-application?sslmode=require"
+  connectionString:"postgresql://chat-application_owner:2jR7UDrgMGtv@ep-bitter-bonus-a5bdozgu.us-east-2.aws.neon.tech/chat-application?sslmode=require&options=--timezone=Asia/Kolkata"
 })
 client.connect(function(err) {
 try {
