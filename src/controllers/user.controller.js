@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const queries = require("../db/queries/Queries");
 const eventEmitter = require("./eventemitter");
+const { query } = require("express");
 
 const uploadProfile = async (req, res) => {
   if (req.file == undefined || req.file.path == undefined) {
@@ -398,9 +399,27 @@ async function deleteProfileFile(id) {
   if (result.rows[0].profile_path != null) {
     fs.unlinkSync(result.rows[0].profile_path);
   }
+
 }
 
-
+async function changeGroupProfile(req, res){
+ try {
+  // let {inbox_id  profile_path } = req.body;
+  let inbox_id = req.body.inbox_id;
+  let profile_path = req.file.path;
+  let inboxData = await client.query(`select * from inbox where inbox_id = $1`, [inbox_id]);
+  let oldUrl = inboxData.rows[0].profile_path;
+  await updateGroupProfile(inbox_id, profile_path);
+  if(inboxData.rows[0].profile_path != null){
+    fs.unlinkSync(oldUrl);
+  }
+  res.status(200).json({ message: "Profile Saved"  });
+ } catch (error) {
+  console.log(error)
+  res.status(500).json({ message: "Unable to save profile , try after some time"});
+ }
+  
+}
 
 module.exports = {
   uploadProfile,
@@ -411,4 +430,5 @@ module.exports = {
   convertImagetoString,
   getInboxInfo,
   fetchChatInfo,
+  changeGroupProfile
 };

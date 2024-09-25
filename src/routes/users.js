@@ -2,10 +2,11 @@ const express = require("express");
 const router = express.Router();
 const upload = require("../db/storage/multerStorage");
 
-const { uploadProfile, getUserById, searchUSers, getAllinbox,createGroup, getInboxInfo, fetchChatInfo } = require("../controllers/user.controller");
+const { uploadProfile, getUserById, searchUSers, getAllinbox,createGroup, getInboxInfo, fetchChatInfo, changeGroupProfile } = require("../controllers/user.controller");
 const { getAllMessages } = require("../controllers/message.controller");
 
 router.post("/upload/profile", upload.single("file"), uploadProfile);
+router.post("/upload/groupProfile", upload.single("file"), changeGroupProfile);
 
 router.get("/getuser/:id", getUserById);
 router.get("/search", searchUSers);
