@@ -2,7 +2,7 @@ const client = require("../db/connect/connections");
 const fs = require("fs");
 const path = require("path");
 const queries = require("../db/queries/Queries");
-const eventEmitter = require("./eventemitter");
+// const eventEmitter = require("./eventemitter");
 const { query } = require("express");
 
 const uploadProfile = async (req, res) => {
@@ -206,12 +206,12 @@ const createGroup = async (req, res) => {
       await client.query(insertMemberQuery, [newInboxId, member]);
     }
     await client.query("COMMIT");
-    eventEmitter.emit("groupCreated", {
-      groupId: newInboxId,
-      groupName,
-      groupMembers,
-      creatorId: myUserId,
-    });
+    // eventEmitter.emit("groupCreated", {
+    //   groupId: newInboxId,
+    //   groupName,
+    //   groupMembers,
+    //   creatorId: myUserId,
+    // });
     console.log("Group Created with ", newInboxId);
     res.status(201).json({ message: "group created successfull" });
   } catch (err) {
